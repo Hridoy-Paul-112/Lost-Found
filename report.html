@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lost & Found – Report & Search</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link rel="stylesheet" href="report.css" />
+</head>
+<body>
+
+<div class="container">
+    <!-- HEADER -->
+    <div class="app-header">
+        <h1><i class="fas fa-university"></i> Campus Lost & Found</h1>
+        <span class="sub"><i class="fas fa-database"></i> All data stored locally</span>
+    </div>
+
+    <!-- TABS -->
+    <div class="tabs">
+        <button class="active" data-tab="lost"><i class="fas fa-frown"></i> Report Lost</button>
+        <button data-tab="found"><i class="fas fa-smile"></i> Report Found</button>
+        <button data-tab="search"><i class="fas fa-search"></i> Search</button>
+    </div>
+
+    <!-- ===== REPORT LOST ===== -->
+    <div id="tab-lost" class="page active">
+        <div class="page-header">
+            <h2><i class="fas fa-frown"></i> Report Lost Item</h2>
+            <p>Fill in the details of the item you lost.</p>
+        </div>
+        <form id="lostForm" class="report-form">
+            <div class="form-row">
+                <div class="form-group">
+                    <label><i class="fas fa-tag"></i> Item Name *</label>
+                    <input type="text" id="lostName" placeholder="e.g. Wallet, Phone" required />
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-list"></i> Category *</label>
+                    <select id="lostCategory" required>
+                        <option value="">Select...</option>
+                        <option value="Electronics">Electronics</option>
+                        <option value="Accessories">Accessories</option>
+                        <option value="Documents">Documents</option>
+                        <option value="Clothing">Clothing</option>
+                        <option value="Books">Books</option>
+                        <option value="Keys">Keys</option>
+                        <option value="ID Cards">ID Cards</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label><i class="fas fa-map-marker-alt"></i> Location *</label>
+                    <input type="text" id="lostLocation" placeholder="e.g. Library, Cafeteria" required />
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-calendar"></i> Date Lost *</label>
+                    <input type="date" id="lostDate" required />
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label><i class="fas fa-palette"></i> Color</label>
+                    <input type="text" id="lostColor" placeholder="e.g. Black, Blue" />
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-image"></i> Image</label>
+                    <input type="file" id="lostImage" accept="image/*" />
+                </div>
+            </div>
+            <div class="form-group full-width">
+                <label><i class="fas fa-align-left"></i> Description *</label>
+                <textarea id="lostDescription" rows="3" placeholder="Describe the item in detail..." required></textarea>
+            </div>
+            <button type="submit"><i class="fas fa-paper-plane"></i> Report Lost Item</button>
+        </form>
+        <div id="lostMessage" class="form-message"></div>
+    </div>
+
+    <!-- ===== REPORT FOUND ===== -->
+    <div id="tab-found" class="page">
+        <div class="page-header">
+            <h2><i class="fas fa-smile"></i> Report Found Item</h2>
+            <p>Help someone find their lost item by reporting it here.</p>
+        </div>
+        <form id="foundForm" class="report-form">
+            <div class="form-row">
+                <div class="form-group">
+                    <label><i class="fas fa-tag"></i> Item Name *</label>
+                    <input type="text" id="foundName" placeholder="e.g. Wallet, Phone" required />
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-list"></i> Category *</label>
+                    <select id="foundCategory" required>
+                        <option value="">Select...</option>
+                        <option value="Electronics">Electronics</option>
+                        <option value="Accessories">Accessories</option>
+                        <option value="Documents">Documents</option>
+                        <option value="Clothing">Clothing</option>
+                        <option value="Books">Books</option>
+                        <option value="Keys">Keys</option>
+                        <option value="ID Cards">ID Cards</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label><i class="fas fa-map-marker-alt"></i> Found Location *</label>
+                    <input type="text" id="foundLocation" placeholder="e.g. Library, Cafeteria" required />
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-calendar"></i> Date Found *</label>
+                    <input type="date" id="foundDate" required />
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label><i class="fas fa-palette"></i> Color</label>
+                    <input type="text" id="foundColor" placeholder="e.g. Black, Blue" />
+                </div>
+                <div class="form-group">
+                    <label><i class="fas fa-image"></i> Image</label>
+                    <input type="file" id="foundImage" accept="image/*" />
+                </div>
+            </div>
+            <div class="form-group full-width">
+                <label><i class="fas fa-align-left"></i> Description *</label>
+                <textarea id="foundDescription" rows="3" placeholder="Describe the item in detail..." required></textarea>
+            </div>
+            <button type="submit"><i class="fas fa-paper-plane"></i> Report Found Item</button>
+        </form>
+        <div id="foundMessage" class="form-message"></div>
+    </div>
+
+    <!-- ===== SEARCH ===== -->
+    <div id="tab-search" class="page">
+        <div class="page-header">
+            <h2><i class="fas fa-search"></i> Search Items</h2>
+            <p>Find lost or found items by filtering below.</p>
+        </div>
+
+        <div class="search-filters">
+            <div class="filter-row">
+                <div class="filter-group">
+                    <label><i class="fas fa-search"></i> Keyword</label>
+                    <input type="text" id="searchKeyword" placeholder="Item name..." />
+                </div>
+                <div class="filter-group">
+                    <label><i class="fas fa-list"></i> Category</label>
+                    <select id="searchCategory">
+                        <option value="">All Categories</option>
+                        <option value="Electronics">Electronics</option>
+                        <option value="Accessories">Accessories</option>
+                        <option value="Documents">Documents</option>
+                        <option value="Clothing">Clothing</option>
+                        <option value="Books">Books</option>
+                        <option value="Keys">Keys</option>
+                        <option value="ID Cards">ID Cards</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label><i class="fas fa-map-marker-alt"></i> Location</label>
+                    <input type="text" id="searchLocation" placeholder="Location..." />
+                </div>
+            </div>
+            <div class="filter-row">
+                <div class="filter-group">
+                    <label><i class="fas fa-calendar"></i> From</label>
+                    <input type="date" id="searchDateFrom" />
+                </div>
+                <div class="filter-group">
+                    <label><i class="fas fa-calendar"></i> To</label>
+                    <input type="date" id="searchDateTo" />
+                </div>
+                <div class="filter-group">
+                    <label><i class="fas fa-tag"></i> Type</label>
+                    <select id="searchType">
+                        <option value="all">All</option>
+                        <option value="lost">Lost</option>
+                        <option value="found">Found</option>
+                    </select>
+                </div>
+                <div class="filter-group" style="flex-direction:row; gap:0.5rem; align-items:flex-end;">
+                    <button onclick="performSearch()"><i class="fas fa-search"></i> Search</button>
+                    <button onclick="resetSearch()" style="background:#e74c3c;"><i class="fas fa-undo"></i> Reset</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="searchResults">
+            <p style="color:#999; text-align:center; padding:2rem;">Use the filters above to search for items.</p>
+        </div>
+    </div>
+</div>
+
+<!-- ===== ITEM DETAIL MODAL ===== -->
+<div id="itemModal" class="modal">
+    <div class="modal-content">
+        <span class="modal-close" onclick="closeModal()">&times;</span>
+        <div id="modalBody"></div>
+    </div>
+</div>
+
+<script src="report.js"></script>
+</body>
+</html>
