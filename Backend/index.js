@@ -7,7 +7,25 @@ const bcrypt = require('bcryptjs');
 const axios = require('axios');
 
 const app = express();
-app.use(cors({ origin: process.env.FRONTEND_URL }));
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5500',
+  'https://lost-found-tau-rosy.vercel.app',
+  process.env.FRONTEND_URL
+].filter(Boolean);
+
+app.use(cors({
+  origin: function (origin, callback) {
+    
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
+}));
 app.use(express.json());
 
 mongoose.connect(process.env.MONGO_URI)
