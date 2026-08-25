@@ -13,23 +13,43 @@
 <header class="navbar">
   <div class="logo" onclick="showPage('home')"><span class="pin">📌</span> Campus Board</div>
   <nav>
-    <a href="#" onclick="showPage('home')">Board</a>
+    <a href="#" onclick="showPage('home')">Public board</a>
     <a href="#" onclick="showPage('post')">Pin an item</a>
     <a href="#" onclick="showPage('myitems')">My pins</a>
-    <a href="#" id="authLink" onclick="showPage('login')">Log in</a>
-    <a href="#" id="registerLink" onclick="showPage('register')" class="cta-link">Sign up</a>
-    <a href="#" id="logoutLink" onclick="logout()" style="display:none;">Log out</a>
-    <span id="userGreeting" class="user-greeting"></span>
   </nav>
+  <div class="nav-account">
+    <!-- Shown when logged OUT -->
+    <div id="loggedOutBox" class="account-box">
+      <a href="#" onclick="showPage('login')">Log in</a>
+      <a href="#" onclick="showPage('register')" class="cta-link">Sign up</a>
+    </div>
+    <!-- Shown when logged IN -->
+    <div id="loggedInBox" class="account-box" style="display:none;">
+      <span id="userGreeting" class="user-greeting"></span>
+      <button onclick="requestLogout()" class="logout-btn">Log out</button>
+    </div>
+  </div>
 </header>
+
+<!-- LOGOUT CONFIRM MODAL -->
+<div id="logoutModal" class="modal">
+  <div class="modal-content confirm-box">
+    <h2>Log out?</h2>
+    <p>You'll need to log back in to pin items or manage your posts.</p>
+    <div class="confirm-actions">
+      <button class="ghost-btn" onclick="cancelLogout()">Cancel</button>
+      <button class="danger" onclick="confirmLogout()">Log out</button>
+    </div>
+  </div>
+</div>
 
 <main>
 
   <!-- HOME / BROWSE -->
   <section id="page-home" class="page active">
     <div class="board-head">
-      <h1>The Board</h1>
-      <p class="sub">Everything reported lost or found on campus, pinned up in real time.</p>
+      <h1>The Public Board</h1>
+      <p class="sub">Every item anyone on campus has reported lost or found. Your posts show up here for everyone — and everyone else's show up too.</p>
     </div>
 
     <div class="filter-bar">
@@ -159,6 +179,7 @@
       <div class="auth-card wide-card">
         <span class="eyebrow">New pin</span>
         <h2>Report a lost or found item</h2>
+        <p class="card-sub">This will be posted to the public board, visible to everyone — not just you.</p>
         <form id="itemForm">
           <div class="type-toggle">
             <input type="radio" name="itype" id="type-lost" value="lost" checked>
@@ -203,8 +224,8 @@
   <!-- MY ITEMS -->
   <section id="page-myitems" class="page">
     <div class="board-head">
-      <h1>My pins</h1>
-      <p class="sub">Everything you've reported. Mark it resolved once it's back where it belongs.</p>
+      <h1>My Pins</h1>
+      <p class="sub">Only visible to you here — this is just a filtered view of your own posts, for editing and marking them resolved. They're still public on the main board for others to see.</p>
     </div>
     <div id="myItemsList" class="board-grid"></div>
   </section>

@@ -1,6 +1,5 @@
 // ===== CONFIG =====
-// ✅ FIX: removed '/api' from base URL; it will be added in apiCall
-const API = 'https://lost-found-2nke.onrender.com';
+const API = 'https://lost-found-2nke.onrender.com';   // base URL (no trailing /api)
 
 // ===== PAGE ROUTING =====
 function showPage(page) {
@@ -18,10 +17,16 @@ function showPage(page) {
 function updateNav() {
   const token = localStorage.getItem('token');
   const name = localStorage.getItem('userName');
-  document.getElementById('authLink').style.display = token ? 'none' : 'inline';
-  document.getElementById('registerLink').style.display = token ? 'none' : 'inline';
-  document.getElementById('logoutLink').style.display = token ? 'inline' : 'none';
-  document.getElementById('userGreeting').textContent = token ? `Hi, ${name}` : '';
+  
+  // Show/hide the two account boxes
+  const loggedOut = document.getElementById('loggedOutBox');
+  const loggedIn = document.getElementById('loggedInBox');
+  if (loggedOut) loggedOut.style.display = token ? 'none' : 'flex';
+  if (loggedIn) loggedIn.style.display = token ? 'flex' : 'none';
+  
+  // Update greeting
+  const greeting = document.getElementById('userGreeting');
+  if (greeting) greeting.textContent = token ? `Hi, ${name}` : '';
 }
 
 // ===== HELPERS =====
@@ -37,7 +42,6 @@ function authHeaders() {
   return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
 }
 
-// ✅ FIXED apiCall function – adds /api prefix & normalizes message fields
 async function apiCall(endpoint, method = 'GET', body = null, needsAuth = false) {
   const opts = {
     method,
@@ -45,22 +49,15 @@ async function apiCall(endpoint, method = 'GET', body = null, needsAuth = false)
   };
   if (body) opts.body = JSON.stringify(body);
 
-  // Ensure endpoint starts with /
   const fullEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  const url = `${API}/api${fullEndpoint}`;  // ✅ /api added here
+  const url = `${API}/api${fullEndpoint}`;   // /api added here
 
   try {
     const res = await fetch(url, opts);
     const data = await res.json();
-
-    // ✅ Normalize message field – supports both 'msg' and 'message'
-    if (data.message && !data.msg) {
-      data.msg = data.message;
-    }
-    if (data.msg && !data.message) {
-      data.message = data.msg;
-    }
-
+    // Normalise message fields
+    if (data.message && !data.msg) data.msg = data.message;
+    if (data.msg && !data.message) data.message = data.msg;
     return { ok: res.ok, data };
   } catch (err) {
     console.error('API Error:', err);
@@ -85,7 +82,7 @@ document.getElementById('registerForm').addEventListener('submit', async (e) => 
   }
 });
 
-// ===== OTP BOX BEHAVIOR (auto-advance, backspace, paste) =====
+// ===== OTP BOX BEHAVIOR =====
 const otpBoxes = document.querySelectorAll('.otp-digit');
 otpBoxes.forEach((box, idx) => {
   box.addEventListener('input', () => {
@@ -103,14 +100,8 @@ otpBoxes.forEach((box, idx) => {
   });
 });
 
-function getOtpValue() {
-  return Array.from(otpBoxes).map(b => b.value).join('');
-}
-
-function clearOtpBoxes() {
-  otpBoxes.forEach(b => b.value = '');
-  otpBoxes[0]?.focus();
-}
+function getOtpValue() { return Array.from(otpBoxes).map(b => b.value).join(''); }
+function clearOtpBoxes() { otpBoxes.forEach(b => b.value = ''); otpBoxes[0]?.focus(); }
 
 // ===== VERIFY OTP =====
 document.getElementById('otpForm').addEventListener('submit', async (e) => {
@@ -183,8 +174,17 @@ document.getElementById('resetForm').addEventListener('submit', async (e) => {
   if (ok) setTimeout(() => showPage('login'), 1100);
 });
 
-// ===== LOGOUT =====
-function logout() {
+// ===== LOGOUT MODAL =====
+function requestLogout() {
+  document.getElementById('logoutModal').style.display = 'flex';
+}
+
+function cancelLogout() {
+  document.getElementById('logoutModal').style.display = 'none';
+}
+
+function confirmLogout() {
+  document.getElementById('logoutModal').style.display = 'none';
   localStorage.removeItem('token');
   localStorage.removeItem('userName');
   localStorage.removeItem('userEmail');
@@ -201,7 +201,6 @@ document.getElementById('itemForm').addEventListener('submit', async (e) => {
   }
 
   const type = document.querySelector('input[name="itype"]:checked').value;
-
   const body = {
     title: document.getElementById('item-title').value,
     description: document.getElementById('item-description').value,
@@ -221,7 +220,7 @@ document.getElementById('itemForm').addEventListener('submit', async (e) => {
   }
 });
 
-// ===== LOAD ITEMS (HOME) =====
+// ===== LOAD ITEMS (PUBLIC BOARD) =====
 async function loadItems() {
   const list = document.getElementById('itemsList');
   const search = document.getElementById('searchInput').value;
@@ -233,10 +232,22 @@ async function loadItems() {
   if (type) params.append('type', type);
   if (category) params.append('category', category);
 
-  const { ok, data } = await apiCall(`/items?${params.toString()}`);
-  if (!ok) return;
+  list.innerHTML = '<p class="empty" style="color:var(--muted);">Loading posts...</p>';
 
-  list.innerHTML = data.length ? data.map(renderCard).join('') : '<p class="empty">Nothing pinned here yet. Be the first to post.</p>';
+  const { ok, data } = await apiCall(`/items?${params.toString()}`);
+
+  if (!ok) {
+    list.innerHTML = '<p class="empty" style="color:var(--red);">⚠️ Could not load posts. Please try again later.</p>';
+    console.error('Failed to load items:', data);
+    return;
+  }
+
+  if (data.length === 0) {
+    list.innerHTML = '<p class="empty">Nothing pinned here yet. Be the first to post.</p>';
+    return;
+  }
+
+  list.innerHTML = data.map(renderCard).join('');
 }
 
 function renderCard(i) {
@@ -260,7 +271,10 @@ async function loadMyItems() {
     return;
   }
   const { ok, data } = await apiCall('/items/user/mine', 'GET', null, true);
-  if (!ok) return;
+  if (!ok) {
+    list.innerHTML = '<p class="empty" style="color:var(--red);">⚠️ Could not load your items.</p>';
+    return;
+  }
 
   list.innerHTML = data.length ? data.map(i => `
     <div class="item-card">
@@ -293,7 +307,10 @@ async function deleteItem(id) {
 // ===== ITEM DETAIL MODAL =====
 async function openModal(id) {
   const { ok, data } = await apiCall(`/items/${id}`);
-  if (!ok) return;
+  if (!ok) {
+    alert('Could not load item details.');
+    return;
+  }
 
   document.getElementById('modalBody').innerHTML = `
     ${data.image ? `<img src="${data.image}" class="modal-img" alt="${data.title}">` : ''}
