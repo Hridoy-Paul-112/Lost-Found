@@ -1,11 +1,13 @@
+// ✅ Single axios import – no duplicates
 const axios = require('axios');
+
+// Rest of dependencies
 require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const axios = require('axios');
 
 const app = express();
 const allowedOrigins = [
@@ -17,7 +19,6 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function (origin, callback) {
-    
     if (!origin) return callback(null, true);
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
@@ -304,4 +305,4 @@ app.delete('/api/items/:id', auth, async (req, res) => {
 
 app.get('/', (req, res) => res.send('Lost & Found API is running'));
 
-app.listen(process.env.PORT, () => console.log(`Server running on port ${process.env.PORT}`));
+app.listen(process.env.PORT || 5000, () => console.log(`Server running on port ${process.env.PORT || 5000}`));
