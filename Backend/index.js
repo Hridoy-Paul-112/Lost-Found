@@ -1,3 +1,4 @@
+
 // ✅ Single axios import – no duplicates
 const axios = require('axios');
 
@@ -10,31 +11,50 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 
 const app = express();
+
+
+// CORS CONFIGURATION – FIXED
+
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:5500',
+  'http://127.0.0.1:5500',
   'https://lost-found-tau-rosy.vercel.app',
   process.env.FRONTEND_URL
 ].filter(Boolean);
 
 app.use(cors({
   origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1) {
+    
+    // Allow if origin is in the allowed list OR is a vercel.app subdomain
+    if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('vercel.app')) {
       callback(null, true);
     } else {
+      console.log('❌ CORS blocked origin:', origin);
       callback(new Error('Not allowed by CORS'));
     }
   },
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
 app.use(express.json());
 
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log('MongoDB connected'))
-  .catch(err => console.error('MongoDB error:', err.message));
 
-// ---- Schemas ----
+// DATABASE CONNECTION
+
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log('✅ MongoDB connected'))
+  .catch(err => console.error('❌ MongoDB error:', err.message));
+
+
+// SCHEMAS
+
+
+// ---- User Schema ----
 const userSchema = new mongoose.Schema({
   name: String,
   email: { type: String, unique: true },
@@ -43,6 +63,7 @@ const userSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', userSchema);
 
+// ---- OTP Schema ----
 const otpSchema = new mongoose.Schema({
   email: String,
   otp: String,
@@ -50,6 +71,7 @@ const otpSchema = new mongoose.Schema({
 });
 const Otp = mongoose.model('Otp', otpSchema);
 
+// ---- Item Schema ----
 const itemSchema = new mongoose.Schema({
   title: String,
   description: String,
@@ -65,24 +87,32 @@ const itemSchema = new mongoose.Schema({
 });
 const Item = mongoose.model('Item', itemSchema);
 
-// ---- Helpers ----
+
+// HELPERS
+
 const genOtp = () => Math.floor(100000 + Math.random() * 900000).toString();
 
 async function sendOtpEmail(email, otp) {
-  await axios.post('https://api.brevo.com/v3/smtp/email', {
-    sender: { name: 'Varsity Lost & Found', email: 'hridoy89hp@gmail.com' },
-    to: [{ email }],
-    subject: 'Your OTP Verification Code',
-    htmlContent: `
-      <div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;">
-        <h2 style="color:#2c3e50;">Varsity Lost & Found</h2>
-        <p>Your OTP verification code is:</p>
-        <h1 style="letter-spacing:5px;color:#e67e22;">${otp}</h1>
-        <p>This code expires in 10 minutes. If you didn't request this, ignore this email.</p>
-      </div>`
-  }, {
-    headers: { 'api-key': process.env.BREVO_API_KEY, 'Content-Type': 'application/json' }
-  });
+  try {
+    await axios.post('https://api.brevo.com/v3/smtp/email', {
+      sender: { name: 'Varsity Lost & Found', email: 'hridoy89hp@gmail.com' },
+      to: [{ email }],
+      subject: 'Your OTP Verification Code',
+      htmlContent: `
+        <div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;">
+          <h2 style="color:#2c3e50;">Varsity Lost & Found</h2>
+          <p>Your OTP verification code is:</p>
+          <h1 style="letter-spacing:5px;color:#e67e22;">${otp}</h1>
+          <p>This code expires in 10 minutes. If you didn't request this, ignore this email.</p>
+        </div>`
+    }, {
+      headers: { 'api-key': process.env.BREVO_API_KEY, 'Content-Type': 'application/json' }
+    });
+    console.log(`✅ OTP email sent to ${email}`);
+  } catch (err) {
+    console.error('❌ Email send error:', err.response?.data || err.message);
+    throw err;
+  }
 }
 
 function auth(req, res, next) {
@@ -96,9 +126,10 @@ function auth(req, res, next) {
   }
 }
 
-// ---- Auth Routes ----
+// AUTH ROUTES
 
-// Step 1: Register -> creates unverified user, sends OTP
+
+// ---- Step 1: Register -> sends OTP ----
 app.post('/api/auth/register', async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -129,7 +160,7 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
-// Step 2: Verify OTP
+// ---- Step 2: Verify OTP ----
 app.post('/api/auth/verify-otp', async (req, res) => {
   try {
     const { email, otp } = req.body;
@@ -147,7 +178,7 @@ app.post('/api/auth/verify-otp', async (req, res) => {
   }
 });
 
-// Resend OTP
+// ---- Resend OTP ----
 app.post('/api/auth/resend-otp', async (req, res) => {
   try {
     const { email } = req.body;
@@ -167,7 +198,7 @@ app.post('/api/auth/resend-otp', async (req, res) => {
   }
 });
 
-// Login
+// ---- Login ----
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -190,7 +221,7 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// Forgot password -> send OTP
+// ---- Forgot password -> send OTP ----
 app.post('/api/auth/forgot-password', async (req, res) => {
   try {
     const { email } = req.body;
@@ -204,11 +235,12 @@ app.post('/api/auth/forgot-password', async (req, res) => {
 
     res.json({ msg: 'OTP sent for password reset' });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ msg: 'Server error' });
   }
 });
 
-// Reset password with OTP
+// ---- Reset password with OTP ----
 app.post('/api/auth/reset-password', async (req, res) => {
   try {
     const { email, otp, newPassword } = req.body;
@@ -222,19 +254,26 @@ app.post('/api/auth/reset-password', async (req, res) => {
 
     res.json({ msg: 'Password reset successful. Please login.' });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ msg: 'Server error' });
   }
 });
 
-// Get current user
+// ---- Get current user ----
 app.get('/api/auth/me', auth, async (req, res) => {
-  const user = await User.findById(req.user.id).select('-password');
-  res.json(user);
+  try {
+    const user = await User.findById(req.user.id).select('-password');
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ msg: 'Server error' });
+  }
 });
 
-// ---- Item Routes ----
 
-// Create item
+// ITEM ROUTES
+
+
+// ---- Create item ----
 app.post('/api/items', auth, async (req, res) => {
   try {
     const item = await Item.create({
@@ -244,11 +283,12 @@ app.post('/api/items', auth, async (req, res) => {
     });
     res.json(item);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ msg: 'Error posting item' });
   }
 });
 
-// Get all items (supports search & filter)
+// ---- Get all items (public) ----
 app.get('/api/items', async (req, res) => {
   try {
     const { search, type, category } = req.query;
@@ -265,44 +305,71 @@ app.get('/api/items', async (req, res) => {
     const items = await Item.find(query).sort({ createdAt: -1 });
     res.json(items);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ msg: 'Error fetching items' });
   }
 });
 
-// Get single item
+// ---- Get single item ----
 app.get('/api/items/:id', async (req, res) => {
-  const item = await Item.findById(req.params.id);
-  if (!item) return res.status(404).json({ msg: 'Item not found' });
-  res.json(item);
+  try {
+    const item = await Item.findById(req.params.id);
+    if (!item) return res.status(404).json({ msg: 'Item not found' });
+    res.json(item);
+  } catch (err) {
+    res.status(500).json({ msg: 'Error fetching item' });
+  }
 });
 
-// Get my items
+// ---- Get my items ----
 app.get('/api/items/user/mine', auth, async (req, res) => {
-  const items = await Item.find({ createdBy: req.user.email }).sort({ createdAt: -1 });
-  res.json(items);
+  try {
+    const items = await Item.find({ createdBy: req.user.email }).sort({ createdAt: -1 });
+    res.json(items);
+  } catch (err) {
+    res.status(500).json({ msg: 'Error fetching your items' });
+  }
 });
 
-// Update item (mark resolved / edit)
+// ---- Update item (mark resolved) ----
 app.put('/api/items/:id', auth, async (req, res) => {
-  const item = await Item.findById(req.params.id);
-  if (!item) return res.status(404).json({ msg: 'Item not found' });
-  if (item.createdBy !== req.user.email) return res.status(403).json({ msg: 'Not authorized' });
+  try {
+    const item = await Item.findById(req.params.id);
+    if (!item) return res.status(404).json({ msg: 'Item not found' });
+    if (item.createdBy !== req.user.email) return res.status(403).json({ msg: 'Not authorized' });
 
-  Object.assign(item, req.body);
-  await item.save();
-  res.json(item);
+    Object.assign(item, req.body);
+    await item.save();
+    res.json(item);
+  } catch (err) {
+    res.status(500).json({ msg: 'Error updating item' });
+  }
 });
 
-// Delete item
+// ---- Delete item ----
 app.delete('/api/items/:id', auth, async (req, res) => {
-  const item = await Item.findById(req.params.id);
-  if (!item) return res.status(404).json({ msg: 'Item not found' });
-  if (item.createdBy !== req.user.email) return res.status(403).json({ msg: 'Not authorized' });
+  try {
+    const item = await Item.findById(req.params.id);
+    if (!item) return res.status(404).json({ msg: 'Item not found' });
+    if (item.createdBy !== req.user.email) return res.status(403).json({ msg: 'Not authorized' });
 
-  await item.deleteOne();
-  res.json({ msg: 'Item deleted' });
+    await item.deleteOne();
+    res.json({ msg: 'Item deleted' });
+  } catch (err) {
+    res.status(500).json({ msg: 'Error deleting item' });
+  }
 });
 
-app.get('/', (req, res) => res.send('Lost & Found API is running'));
 
-app.listen(process.env.PORT || 5000, () => console.log(`Server running on port ${process.env.PORT || 5000}`));
+// HEALTH CHECK
+
+app.get('/', (req, res) => res.send('✅ Lost & Found API is running'));
+
+
+// START SERVER
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`📍 Allowed origins:`, allowedOrigins);
+});
