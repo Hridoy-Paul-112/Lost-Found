@@ -1,64 +1,64 @@
-// app.js - Full authentication with OTP and password reset
+// ============================================================
+// FOUND & LOST - FACEBOOK-STYLE UI (Fully functional)
+// ============================================================
 
-// ---------- CONFIGURATION ----------
-// Backend API URL (Render deployment)
-const API_BASE_URL = 'https://lost-found-2nke.onrender.com/api/auth';
+const API_BASE = 'https://lost-found-2nke.onrender.com/api/auth';
+const POSTS_API = 'https://lost-found-2nke.onrender.com/api/posts';
 
-// ---------- MAIN APP ----------
+const getToken = () => localStorage.getItem('token');
+const setToken = (t) => localStorage.setItem('token', t);
+const removeToken = () => localStorage.removeItem('token');
+
 const App = () => {
-    // ===================== STATE =====================
-    const [page, setPage] = React.useState('login'); // login | register | verifyOtp | forgotPassword | resetPassword
+    // ========== STATE ==========
+    const [user, setUser] = React.useState(null);
+    const [loading, setLoading] = React.useState(true);
 
-    // Login state
+    // Page: home | login | register | verifyOtp | forgotPassword | resetPassword | dashboard | createPost | postDetail | profile
+    const [page, setPage] = React.useState('home');
+
+    // Auth forms
     const [loginEmail, setLoginEmail] = React.useState('');
     const [loginPassword, setLoginPassword] = React.useState('');
-
-    // Register state
-    const [registerData, setRegisterData] = React.useState({
-        name: '',
-        email: '',
-        password: '',
-        confirmPassword: '',
-        university: ''
-    });
+    const [reg, setReg] = React.useState({ name: '', email: '', password: '', confirm: '', university: '' });
     const [otp, setOtp] = React.useState(['', '', '', '', '', '']);
-
-    // Forgot password state
     const [forgotEmail, setForgotEmail] = React.useState('');
-    const [resetPasswordData, setResetPasswordData] = React.useState({
-        email: '',
-        otp: '',
-        newPassword: '',
-        confirmNewPassword: ''
-    });
+    const [reset, setReset] = React.useState({ email: '', otp: '', newPassword: '', confirm: '' });
 
-    // UI states
-    const [loading, setLoading] = React.useState(false);
-    const [message, setMessage] = React.useState({ text: '', type: '' });
+    // Posts
+    const [posts, setPosts] = React.useState([]);
+    const [currentPost, setCurrentPost] = React.useState(null);
+    const [filter, setFilter] = React.useState('all');
+    const [search, setSearch] = React.useState('');
+    const [newPost, setNewPost] = React.useState({ title: '', description: '', category: 'lost', itemName: '', location: '', contactInfo: '' });
+    const [postImage, setPostImage] = React.useState(null);
+
+    // UI
+    const [msg, setMsg] = React.useState({ text: '', type: '' });
     const [resendTimer, setResendTimer] = React.useState(0);
+    const [submitting, setSubmitting] = React.useState(false);
 
-    // ===================== HELPER FUNCTIONS =====================
-    const showMessage = (text, type) => {
-        setMessage({ text, type });
+    // ========== HELPERS ==========
+    const showMsg = (text, type) => {
+        setMsg({ text, type });
         clearTimeout(window.msgTimeout);
-        window.msgTimeout = setTimeout(() => setMessage({ text: '', type: '' }), 5000);
+        window.msgTimeout = setTimeout(() => setMsg({ text: '', type: '' }), 5000);
     };
-
-    const clearMessage = () => setMessage({ text: '', type: '' });
-
-    const handleOtpChange = (index, value) => {
-        if (value.length > 1) return;
-        const newOtp = [...otp];
-        newOtp[index] = value;
-        setOtp(newOtp);
-        if (value && index < 5) {
-            document.getElementById(`otp-${index+1}`)?.focus();
-        }
-    };
+    const clearMsg = () => setMsg({ text: '', type: '' });
 
     const getOtpString = () => otp.join('');
 
-    const startResendTimer = () => {
+    const handleOtpChange = (idx, val) => {
+        if (val.length > 1) return;
+        const newOtp = [...otp];
+        newOtp[idx] = val;
+        setOtp(newOtp);
+        if (val && idx < 5) {
+            document.getElementById(`otp-${idx+1}`)?.focus();
+        }
+    };
+
+    const startTimer = () => {
         setResendTimer(60);
         const interval = setInterval(() => {
             setResendTimer(prev => {
@@ -68,199 +68,293 @@ const App = () => {
         }, 1000);
     };
 
-    // ===================== API CALLS =====================
-
-    // 1. Register - Send OTP
-    const handleRegisterSubmit = async (e) => {
-        e.preventDefault();
-        clearMessage();
-
-        if (registerData.password !== registerData.confirmPassword) {
-            showMessage('Passwords do not match!', 'error');
-            return;
-        }
-
-        setLoading(true);
+    // ========== AUTH ==========
+    const checkAuth = async () => {
+        const token = getToken();
+        if (!token) { setLoading(false); return; }
         try {
-            const res = await fetch(`${API_BASE_URL}/register`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name: registerData.name,
-                    email: registerData.email,
-                    password: registerData.password,
-                    university: registerData.university
-                })
+            const res = await fetch(`${API_BASE}/me`, {
+                headers: { 'Authorization': `Bearer ${token}` }
             });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.message || 'Registration failed');
-            
-            setPage('verifyOtp');
-            showMessage('OTP sent to your email. Please verify.', 'success');
-            startResendTimer();
-        } catch (err) {
-            showMessage(err.message, 'error');
-        } finally {
-            setLoading(false);
-        }
+            if (res.ok) {
+                const data = await res.json();
+                setUser(data);
+            } else {
+                removeToken();
+            }
+        } catch (e) { removeToken(); }
+        setLoading(false);
     };
 
-    // 2. Verify OTP - Complete Registration
-    const handleVerifyOtp = async () => {
-        clearMessage();
-        const otpCode = getOtpString();
-        if (otpCode.length < 6) {
-            showMessage('Please enter the full 6-digit OTP.', 'error');
-            return;
-        }
-        setLoading(true);
-        try {
-            const res = await fetch(`${API_BASE_URL}/verify-otp`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    email: registerData.email,
-                    otp: otpCode
-                })
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.message || 'OTP verification failed');
-            
-            localStorage.setItem('token', data.token);
-            showMessage('Registration successful! Welcome.', 'success');
-            setTimeout(() => {
-                alert('🎉 You are now registered and logged in!\nWelcome to Found & Lost!');
-                setPage('login');
-                setRegisterData({ name: '', email: '', password: '', confirmPassword: '', university: '' });
-                setOtp(['', '', '', '', '', '']);
-            }, 1000);
-        } catch (err) {
-            showMessage(err.message, 'error');
-        } finally {
-            setLoading(false);
-        }
-    };
+    React.useEffect(() => { checkAuth(); }, []);
 
-    // 3. Resend OTP
-    const handleResendOtp = async () => {
-        if (resendTimer > 0) return;
-        setLoading(true);
-        try {
-            const res = await fetch(`${API_BASE_URL}/resend-otp`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: registerData.email })
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.message || 'Resend failed');
-            showMessage('OTP resent successfully.', 'success');
-            startResendTimer();
-        } catch (err) {
-            showMessage(err.message, 'error');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    // 4. Login
     const handleLogin = async (e) => {
         e.preventDefault();
-        clearMessage();
-        setLoading(true);
+        clearMsg();
+        setSubmitting(true);
         try {
-            const res = await fetch(`${API_BASE_URL}/login`, {
+            const res = await fetch(`${API_BASE}/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: loginEmail, password: loginPassword })
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.message || 'Login failed');
-            
-            localStorage.setItem('token', data.token);
-            showMessage('Login successful!', 'success');
-            setTimeout(() => {
-                alert('👋 Welcome back ' + data.name + '!\nDashboard coming soon.');
-                setLoginEmail('');
-                setLoginPassword('');
-            }, 1000);
+            setToken(data.token);
+            setUser(data);
+            showMsg(`Welcome back ${data.name}!`, 'success');
+            setLoginEmail(''); setLoginPassword('');
+            setPage('home');
         } catch (err) {
-            showMessage(err.message, 'error');
+            showMsg(err.message, 'error');
         } finally {
-            setLoading(false);
+            setSubmitting(false);
         }
     };
 
-    // 5. Forgot Password - Send OTP
-    const handleForgotPassword = async (e) => {
+    const handleRegister = async (e) => {
         e.preventDefault();
-        clearMessage();
-        if (!forgotEmail) {
-            showMessage('Please enter your email.', 'error');
+        clearMsg();
+        if (reg.password !== reg.confirm) {
+            showMsg('Passwords do not match.', 'error');
             return;
         }
-        setLoading(true);
+        setSubmitting(true);
         try {
-            const res = await fetch(`${API_BASE_URL}/forgot-password`, {
+            const res = await fetch(`${API_BASE}/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: reg.name, email: reg.email, password: reg.password, university: reg.university })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Registration failed');
+            setPage('verifyOtp');
+            showMsg('OTP sent to your email.', 'success');
+            startTimer();
+        } catch (err) {
+            showMsg(err.message, 'error');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleVerifyOtp = async () => {
+        clearMsg();
+        const code = getOtpString();
+        if (code.length < 6) { showMsg('Enter full 6-digit OTP.', 'error'); return; }
+        setSubmitting(true);
+        try {
+            const res = await fetch(`${API_BASE}/verify-otp`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: reg.email, otp: code })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'OTP verification failed');
+            setToken(data.token);
+            setUser(data);
+            showMsg('Registration successful!', 'success');
+            setPage('home');
+            setReg({ name: '', email: '', password: '', confirm: '', university: '' });
+            setOtp(['', '', '', '', '', '']);
+        } catch (err) {
+            showMsg(err.message, 'error');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleResendOtp = async () => {
+        if (resendTimer > 0) return;
+        setSubmitting(true);
+        try {
+            const res = await fetch(`${API_BASE}/resend-otp`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: reg.email })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Resend failed');
+            showMsg('OTP resent.', 'success');
+            startTimer();
+        } catch (err) {
+            showMsg(err.message, 'error');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleForgot = async (e) => {
+        e.preventDefault();
+        clearMsg();
+        setSubmitting(true);
+        try {
+            const res = await fetch(`${API_BASE}/forgot-password`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: forgotEmail })
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.message || 'Failed to send reset OTP');
-            
-            setResetPasswordData(prev => ({ ...prev, email: forgotEmail }));
+            setReset(prev => ({ ...prev, email: forgotEmail }));
             setPage('resetPassword');
-            showMessage('OTP sent to your email. Please check.', 'success');
-            startResendTimer();
+            showMsg('OTP sent to your email.', 'success');
+            startTimer();
         } catch (err) {
-            showMessage(err.message, 'error');
+            showMsg(err.message, 'error');
         } finally {
-            setLoading(false);
+            setSubmitting(false);
         }
     };
 
-    // 6. Reset Password
-    const handleResetPassword = async (e) => {
+    const handleReset = async (e) => {
         e.preventDefault();
-        clearMessage();
-        const { email, otp: resetOtp, newPassword, confirmNewPassword } = resetPasswordData;
-        
-        if (newPassword !== confirmNewPassword) {
-            showMessage('Passwords do not match!', 'error');
+        clearMsg();
+        if (reset.newPassword !== reset.confirm) {
+            showMsg('Passwords do not match.', 'error');
             return;
         }
-        if (newPassword.length < 6) {
-            showMessage('Password must be at least 6 characters.', 'error');
-            return;
-        }
-        setLoading(true);
+        setSubmitting(true);
         try {
-            const res = await fetch(`${API_BASE_URL}/reset-password`, {
+            const res = await fetch(`${API_BASE}/reset-password`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, otp: resetOtp, newPassword })
+                body: JSON.stringify({ email: reset.email, otp: reset.otp, newPassword: reset.newPassword })
             });
             const data = await res.json();
-            if (!res.ok) throw new Error(data.message || 'Password reset failed');
-            
-            showMessage('Password reset successfully! Please login.', 'success');
-            setTimeout(() => {
-                setPage('login');
-                setResetPasswordData({ email: '', otp: '', newPassword: '', confirmNewPassword: '' });
-            }, 1500);
+            if (!res.ok) throw new Error(data.message || 'Reset failed');
+            showMsg('Password reset successfully.', 'success');
+            setPage('login');
+            setReset({ email: '', otp: '', newPassword: '', confirm: '' });
         } catch (err) {
-            showMessage(err.message, 'error');
+            showMsg(err.message, 'error');
         } finally {
-            setLoading(false);
+            setSubmitting(false);
         }
     };
 
-    // ===================== RENDER FUNCTIONS =====================
+    const logout = () => {
+        removeToken();
+        setUser(null);
+        setPage('home');
+        showMsg('Logged out.', 'success');
+    };
 
-    const renderLogin = () => (
-        <div>
-            <h2>🔐 Login</h2>
-            <p className="subtitle">Welcome back to Found & Lost</p>
+    // ========== POSTS ==========
+    const fetchPosts = async () => {
+        try {
+            const res = await fetch(POSTS_API);
+            const data = await res.json();
+            setPosts(data);
+        } catch (e) { console.error(e); }
+    };
+
+    React.useEffect(() => {
+        if (page === 'home' || page === 'dashboard') fetchPosts();
+    }, [page]);
+
+    const createPost = async (e) => {
+        e.preventDefault();
+        clearMsg();
+        if (!user) { showMsg('Please login first.', 'error'); return; }
+        setSubmitting(true);
+        const formData = new FormData();
+        Object.keys(newPost).forEach(k => formData.append(k, newPost[k]));
+        if (postImage) formData.append('image', postImage);
+        try {
+            const res = await fetch(POSTS_API, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${getToken()}` },
+                body: formData
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Create failed');
+            showMsg('Post created!', 'success');
+            setNewPost({ title: '', description: '', category: 'lost', itemName: '', location: '', contactInfo: '' });
+            setPostImage(null);
+            setPage('home');
+            fetchPosts();
+        } catch (err) {
+            showMsg(err.message, 'error');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const deletePost = async (id) => {
+        if (!confirm('Delete this post?')) return;
+        try {
+            const res = await fetch(`${POSTS_API}/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${getToken()}` }
+            });
+            if (!res.ok) throw new Error('Delete failed');
+            showMsg('Post deleted.', 'success');
+            setPage('home');
+            fetchPosts();
+        } catch (err) {
+            showMsg(err.message, 'error');
+        }
+    };
+
+    const resolvePost = async (id) => {
+        try {
+            const res = await fetch(`${POSTS_API}/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
+                body: JSON.stringify({ isResolved: true })
+            });
+            if (!res.ok) throw new Error('Resolve failed');
+            showMsg('Marked as resolved!', 'success');
+            setPage('home');
+            fetchPosts();
+        } catch (err) {
+            showMsg(err.message, 'error');
+        }
+    };
+
+    // Filtered posts
+    const filtered = posts.filter(p => {
+        if (filter !== 'all' && p.category !== filter) return false;
+        if (search) {
+            const s = search.toLowerCase();
+            return p.title.toLowerCase().includes(s) || p.description.toLowerCase().includes(s) || p.itemName.toLowerCase().includes(s);
+        }
+        return true;
+    });
+
+    // ========== RENDER COMPONENTS ==========
+
+    const Navbar = () => (
+        <nav className="navbar">
+            <a href="#" className="brand" onClick={() => setPage('home')}>
+                📘 Found<span>&</span>Lost
+            </a>
+            <div className="nav-links">
+                <a href="#" onClick={() => setPage('home')}>Home</a>
+                {user ? (
+                    <>
+                        <a href="#" onClick={() => setPage('dashboard')}>Dashboard</a>
+                        <a href="#" onClick={() => setPage('createPost')}>+ New Post</a>
+                        <span className="user-name">{user.name}</span>
+                        <a href="#" onClick={() => setPage('profile')}>Profile</a>
+                        <a href="#" className="logout-btn" onClick={logout}>Logout</a>
+                    </>
+                ) : (
+                    <>
+                        <a href="#" onClick={() => setPage('login')}>Login</a>
+                        <a href="#" className="btn-primary" onClick={() => setPage('register')}>Register</a>
+                    </>
+                )}
+            </div>
+        </nav>
+    );
+
+    // AUTH PAGES (login, register, verify, forgot, reset) - similar but cleaner
+    const LoginPage = () => (
+        <div className="auth-card">
+            <h2>Log In</h2>
+            <p className="subtitle">to continue to Found & Lost</p>
             <form onSubmit={handleLogin}>
                 <div className="input-group">
                     <label>Email</label>
@@ -270,137 +364,221 @@ const App = () => {
                     <label>Password</label>
                     <input type="password" value={loginPassword} onChange={e => setLoginPassword(e.target.value)} required minLength="6" />
                 </div>
-                <button type="submit" className="btn" disabled={loading}>{loading ? 'Logging in...' : 'Login'}</button>
+                <button type="submit" className="btn" disabled={submitting}>{submitting ? 'Logging in...' : 'Log In'}</button>
             </form>
-            <div className="toggle-link">
-                <span onClick={() => setPage('register')}>Don't have an account? Register</span>
-            </div>
-            <div className="toggle-link" style={{ marginTop: '5px' }}>
-                <span onClick={() => setPage('forgotPassword')}>Forgot password?</span>
-            </div>
+            <div className="toggle-link"><span onClick={() => setPage('register')}>Create New Account</span></div>
+            <div className="toggle-link" style={{ marginTop: '6px' }}><span onClick={() => setPage('forgotPassword')}>Forgot Password?</span></div>
         </div>
     );
 
-    const renderRegister = () => (
-        <div>
-            <h2>📝 Register</h2>
-            <p className="subtitle">Create your Found & Lost account</p>
-            <form onSubmit={handleRegisterSubmit}>
-                <div className="input-group">
-                    <label>Full Name</label>
-                    <input type="text" value={registerData.name} onChange={e => setRegisterData({...registerData, name: e.target.value})} required />
-                </div>
-                <div className="input-group">
-                    <label>Email</label>
-                    <input type="email" value={registerData.email} onChange={e => setRegisterData({...registerData, email: e.target.value})} required />
-                </div>
-                <div className="input-group">
-                    <label>University</label>
-                    <input type="text" value={registerData.university} onChange={e => setRegisterData({...registerData, university: e.target.value})} required />
-                </div>
-                <div className="input-group">
-                    <label>Password (min 6 chars)</label>
-                    <input type="password" value={registerData.password} onChange={e => setRegisterData({...registerData, password: e.target.value})} required minLength="6" />
-                </div>
-                <div className="input-group">
-                    <label>Confirm Password</label>
-                    <input type="password" value={registerData.confirmPassword} onChange={e => setRegisterData({...registerData, confirmPassword: e.target.value})} required />
-                </div>
-                <button type="submit" className="btn" disabled={loading}>{loading ? 'Sending OTP...' : 'Register'}</button>
+    const RegisterPage = () => (
+        <div className="auth-card">
+            <h2>Sign Up</h2>
+            <p className="subtitle">It's quick and easy.</p>
+            <form onSubmit={handleRegister}>
+                <div className="input-group"><label>Full Name</label><input type="text" value={reg.name} onChange={e => setReg({...reg, name: e.target.value})} required /></div>
+                <div className="input-group"><label>Email</label><input type="email" value={reg.email} onChange={e => setReg({...reg, email: e.target.value})} required /></div>
+                <div className="input-group"><label>University</label><input type="text" value={reg.university} onChange={e => setReg({...reg, university: e.target.value})} required /></div>
+                <div className="input-group"><label>Password</label><input type="password" value={reg.password} onChange={e => setReg({...reg, password: e.target.value})} required minLength="6" /></div>
+                <div className="input-group"><label>Confirm Password</label><input type="password" value={reg.confirm} onChange={e => setReg({...reg, confirm: e.target.value})} required /></div>
+                <button type="submit" className="btn" disabled={submitting}>{submitting ? 'Sending OTP...' : 'Sign Up'}</button>
             </form>
-            <div className="toggle-link">
-                <span onClick={() => setPage('login')}>Already have an account? Login</span>
-            </div>
+            <div className="toggle-link"><span onClick={() => setPage('login')}>Already have an account? Log in</span></div>
         </div>
     );
 
-    const renderVerifyOtp = () => (
-        <div>
-            <h2>📧 Verify OTP</h2>
-            <p className="subtitle">Enter the 6-digit code sent to {registerData.email}</p>
+    const VerifyOtpPage = () => (
+        <div className="auth-card">
+            <h2>Verify Email</h2>
+            <p className="subtitle">Enter the 6-digit code sent to {reg.email}</p>
             <div className="otp-group">
                 {[0,1,2,3,4,5].map(i => (
-                    <input
-                        key={i}
-                        id={`otp-${i}`}
-                        type="text"
-                        maxLength="1"
-                        value={otp[i] || ''}
-                        onChange={e => handleOtpChange(i, e.target.value)}
-                        onFocus={e => e.target.select()}
-                    />
+                    <input key={i} id={`otp-${i}`} type="text" maxLength="1" value={otp[i] || ''} onChange={e => handleOtpChange(i, e.target.value)} onFocus={e => e.target.select()} />
                 ))}
             </div>
-            <button className="btn" onClick={handleVerifyOtp} disabled={loading}>{loading ? 'Verifying...' : 'Verify OTP'}</button>
+            <button className="btn" onClick={handleVerifyOtp} disabled={submitting}>{submitting ? 'Verifying...' : 'Verify'}</button>
             <div className="resend-link">
-                {resendTimer > 0 ? (
-                    <span className="disabled">Resend OTP in {resendTimer}s</span>
-                ) : (
-                    <span onClick={handleResendOtp}>Resend OTP</span>
-                )}
+                {resendTimer > 0 ? <span className="disabled">Resend in {resendTimer}s</span> : <span onClick={handleResendOtp}>Resend OTP</span>}
             </div>
-            <div className="toggle-link">
-                <span onClick={() => { setPage('login'); setRegisterData({name:'', email:'', password:'', confirmPassword:'', university:''}); setOtp(['','','','','','']); }}>Back to Login</span>
-            </div>
+            <div className="toggle-link"><span onClick={() => { setPage('login'); setReg({name:'', email:'', password:'', confirm:'', university:''}); setOtp(['','','','','','']); }}>Back to Login</span></div>
         </div>
     );
 
-    const renderForgotPassword = () => (
-        <div>
-            <h2>🔑 Forgot Password</h2>
-            <p className="subtitle">We'll send an OTP to reset your password</p>
-            <form onSubmit={handleForgotPassword}>
-                <div className="input-group">
-                    <label>Email</label>
-                    <input type="email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} required />
-                </div>
-                <button type="submit" className="btn" disabled={loading}>{loading ? 'Sending OTP...' : 'Send Reset OTP'}</button>
+    const ForgotPage = () => (
+        <div className="auth-card">
+            <h2>Reset Password</h2>
+            <p className="subtitle">Enter your email to receive an OTP</p>
+            <form onSubmit={handleForgot}>
+                <div className="input-group"><label>Email</label><input type="email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} required /></div>
+                <button type="submit" className="btn" disabled={submitting}>{submitting ? 'Sending...' : 'Send OTP'}</button>
             </form>
-            <div className="toggle-link">
-                <span onClick={() => setPage('login')}>Back to Login</span>
-            </div>
+            <div className="toggle-link"><span onClick={() => setPage('login')}>Back to Login</span></div>
         </div>
     );
 
-    const renderResetPassword = () => (
-        <div>
-            <h2>🔄 Reset Password</h2>
-            <p className="subtitle">Enter the OTP and choose a new password</p>
-            <form onSubmit={handleResetPassword}>
-                <div className="input-group">
-                    <label>Email</label>
-                    <input type="email" value={resetPasswordData.email} disabled />
-                </div>
-                <div className="input-group">
-                    <label>OTP (6 digits)</label>
-                    <input type="text" value={resetPasswordData.otp} onChange={e => setResetPasswordData({...resetPasswordData, otp: e.target.value})} required maxLength="6" placeholder="Enter 6-digit OTP" />
-                </div>
-                <div className="input-group">
-                    <label>New Password</label>
-                    <input type="password" value={resetPasswordData.newPassword} onChange={e => setResetPasswordData({...resetPasswordData, newPassword: e.target.value})} required minLength="6" />
-                </div>
-                <div className="input-group">
-                    <label>Confirm New Password</label>
-                    <input type="password" value={resetPasswordData.confirmNewPassword} onChange={e => setResetPasswordData({...resetPasswordData, confirmNewPassword: e.target.value})} required />
-                </div>
-                <button type="submit" className="btn" disabled={loading}>{loading ? 'Resetting...' : 'Reset Password'}</button>
+    const ResetPage = () => (
+        <div className="auth-card">
+            <h2>Set New Password</h2>
+            <p className="subtitle">Enter OTP and new password</p>
+            <form onSubmit={handleReset}>
+                <div className="input-group"><label>Email</label><input type="email" value={reset.email} disabled /></div>
+                <div className="input-group"><label>OTP</label><input type="text" value={reset.otp} onChange={e => setReset({...reset, otp: e.target.value})} required maxLength="6" /></div>
+                <div className="input-group"><label>New Password</label><input type="password" value={reset.newPassword} onChange={e => setReset({...reset, newPassword: e.target.value})} required minLength="6" /></div>
+                <div className="input-group"><label>Confirm Password</label><input type="password" value={reset.confirm} onChange={e => setReset({...reset, confirm: e.target.value})} required /></div>
+                <button type="submit" className="btn" disabled={submitting}>{submitting ? 'Resetting...' : 'Reset Password'}</button>
             </form>
-            <div className="toggle-link">
-                <span onClick={() => { setPage('login'); setResetPasswordData({email:'', otp:'', newPassword:'', confirmNewPassword:''}); }}>Back to Login</span>
+            <div className="toggle-link"><span onClick={() => { setPage('login'); setReset({email:'', otp:'', newPassword:'', confirm:''}); }}>Back to Login</span></div>
+        </div>
+    );
+
+    // ===== POST CARD =====
+    const PostCard = ({ post }) => {
+        const isLost = post.category === 'lost';
+        const imgUrl = post.image ? `https://lost-found-2nke.onrender.com${post.image}` : null;
+        return (
+            <div className="post-card" onClick={() => { setCurrentPost(post); setPage('postDetail'); }}>
+                <div className="post-header">
+                    <span className={`post-category ${isLost ? 'lost' : 'found'}`}>{isLost ? '🔴 Lost' : '🟢 Found'}</span>
+                    <span style={{ color: '#606770', fontSize: '13px' }}>{new Date(post.createdAt).toLocaleDateString()}</span>
+                </div>
+                <div className="post-title">{post.title}</div>
+                <div className="post-desc">{post.description}</div>
+                {imgUrl && <img src={imgUrl} alt="post" className="post-image" />}
+                <div className="post-meta">
+                    <span className="user">👤 {post.user?.name || 'Unknown'}</span>
+                    <span>📍 {post.location}</span>
+                </div>
+            </div>
+        );
+    };
+
+    // ===== HOME PAGE =====
+    const HomePage = () => (
+        <div>
+            <div className="page-header"><h1>📰 Feed</h1><p>Lost or found something? Post it here.</p></div>
+            <div className="filter-bar">
+                <button className={`filter-btn ${filter === 'all' ? 'active' : ''}`} onClick={() => setFilter('all')}>All</button>
+                <button className={`filter-btn ${filter === 'lost' ? 'active' : ''}`} onClick={() => setFilter('lost')}>Lost</button>
+                <button className={`filter-btn ${filter === 'found' ? 'active' : ''}`} onClick={() => setFilter('found')}>Found</button>
+            </div>
+            <div className="search-bar">
+                <input type="text" placeholder="Search posts..." value={search} onChange={e => setSearch(e.target.value)} />
+                <button onClick={() => setSearch('')}>Clear</button>
+            </div>
+            <div className="posts-grid">
+                {filtered.map(p => <PostCard key={p._id} post={p} />)}
+                {filtered.length === 0 && <div style={{ textAlign: 'center', padding: '40px 0', color: '#606770' }}>No posts found.</div>}
             </div>
         </div>
     );
 
-    // ===================== MAIN RENDER =====================
+    // ===== DASHBOARD =====
+    const DashboardPage = () => {
+        const myPosts = posts.filter(p => p.user?._id === user?._id);
+        const stats = { total: myPosts.length, lost: myPosts.filter(p => p.category === 'lost').length, found: myPosts.filter(p => p.category === 'found').length, resolved: myPosts.filter(p => p.isResolved).length };
+        return (
+            <div>
+                <div className="page-header"><h1>📊 Dashboard</h1><p>Welcome back, {user?.name}!</p></div>
+                <div className="stats-grid">
+                    <div className="stat-card"><div className="number">{stats.total}</div><div className="label">Total</div></div>
+                    <div className="stat-card"><div className="number" style={{ color: '#dc3545' }}>{stats.lost}</div><div className="label">Lost</div></div>
+                    <div className="stat-card"><div className="number" style={{ color: '#28a745' }}>{stats.found}</div><div className="label">Found</div></div>
+                    <div className="stat-card"><div className="number" style={{ color: '#1877f2' }}>{stats.resolved}</div><div className="label">Resolved</div></div>
+                </div>
+                <div className="flex justify-between" style={{ marginBottom: '12px' }}><h3>Your Posts</h3><button className="btn btn-primary" onClick={() => setPage('createPost')}>+ New</button></div>
+                <div className="posts-grid">{myPosts.map(p => <PostCard key={p._id} post={p} />)}</div>
+            </div>
+        );
+    };
+
+    // ===== CREATE POST =====
+    const CreatePostPage = () => (
+        <div className="create-post">
+            <h2>📝 Create Post</h2>
+            <p className="subtitle">Help others find or return items.</p>
+            <form onSubmit={createPost}>
+                <div className="input-group"><label>Title</label><input type="text" value={newPost.title} onChange={e => setNewPost({...newPost, title: e.target.value})} required /></div>
+                <div className="input-group"><label>Description</label><textarea value={newPost.description} onChange={e => setNewPost({...newPost, description: e.target.value})} required /></div>
+                <div className="input-group"><label>Category</label><select value={newPost.category} onChange={e => setNewPost({...newPost, category: e.target.value})}><option value="lost">Lost</option><option value="found">Found</option></select></div>
+                <div className="input-group"><label>Item Name</label><input type="text" value={newPost.itemName} onChange={e => setNewPost({...newPost, itemName: e.target.value})} required /></div>
+                <div className="input-group"><label>Location</label><input type="text" value={newPost.location} onChange={e => setNewPost({...newPost, location: e.target.value})} required /></div>
+                <div className="input-group"><label>Contact Info</label><input type="text" value={newPost.contactInfo} onChange={e => setNewPost({...newPost, contactInfo: e.target.value})} /></div>
+                <div className="input-group"><label>Image</label><input type="file" accept="image/*" onChange={e => setPostImage(e.target.files[0])} /></div>
+                <button type="submit" className="btn" disabled={submitting}>{submitting ? 'Creating...' : 'Create Post'}</button>
+            </form>
+            <div className="toggle-link" style={{ marginTop: '16px' }}><span onClick={() => setPage('home')}>← Back to Feed</span></div>
+        </div>
+    );
+
+    // ===== POST DETAIL =====
+    const PostDetailPage = () => {
+        if (!currentPost) return <div>Loading...</div>;
+        const p = currentPost;
+        const isOwner = user && user._id === p.user?._id;
+        const isLost = p.category === 'lost';
+        const imgUrl = p.image ? `https://lost-found-2nke.onrender.com${p.image}` : null;
+        return (
+            <div className="post-detail">
+                {imgUrl && <img src={imgUrl} alt="post" className="post-image" />}
+                <span className={`category-badge ${isLost ? 'lost' : 'found'}`}>{isLost ? '🔴 Lost' : '🟢 Found'}</span>
+                <h1>{p.title}</h1>
+                <div className="description">{p.description}</div>
+                <div className="info-grid">
+                    <div><div className="label">Item</div><div className="value">{p.itemName}</div></div>
+                    <div><div className="label">Location</div><div className="value">📍 {p.location}</div></div>
+                    <div><div className="label">Date</div><div className="value">{new Date(p.createdAt).toLocaleDateString()}</div></div>
+                    <div><div className="label">Contact</div><div className="value">{p.contactInfo || 'N/A'}</div></div>
+                </div>
+                <div className="user-section">
+                    <div className="avatar">{p.user?.name?.charAt(0) || 'U'}</div>
+                    <div><strong>{p.user?.name}</strong><br /><span style={{ color: '#606770' }}>{p.user?.university}</span></div>
+                </div>
+                <div className="actions">
+                    <button className="btn btn-secondary" onClick={() => setPage('home')}>← Back</button>
+                    {isOwner && (
+                        <>
+                            {!p.isResolved && <button className="btn btn-success" onClick={() => resolvePost(p._id)}>✅ Resolve</button>}
+                            <button className="btn btn-danger" onClick={() => deletePost(p._id)}>🗑️ Delete</button>
+                        </>
+                    )}
+                    {p.isResolved && <span style={{ color: '#28a745', fontWeight: 600 }}>✅ Resolved</span>}
+                </div>
+            </div>
+        );
+    };
+
+    // ===== PROFILE =====
+    const ProfilePage = () => (
+        <div className="profile-card">
+            <div className="avatar">{user?.name?.charAt(0) || 'U'}</div>
+            <div className="name">{user?.name}</div>
+            <div className="email">{user?.email}</div>
+            <div className="university">🎓 {user?.university}</div>
+            {user?.department && <div style={{ color: '#606770', marginTop: '4px' }}>{user.department}</div>}
+            {user?.phone && <div style={{ color: '#606770' }}>📱 {user.phone}</div>}
+            <button className="btn btn-secondary" style={{ marginTop: '20px' }} onClick={() => setPage('dashboard')}>← Dashboard</button>
+        </div>
+    );
+
+    // ========== MAIN RENDER ==========
+    if (loading && !user) {
+        return <div style={{ padding: '60px', textAlign: 'center' }}>Loading...</div>;
+    }
+
     return (
-        <div className="container">
-            {message.text && <div id="messageBox" className={message.type}>{message.text}</div>}
-
-            {page === 'login' && renderLogin()}
-            {page === 'register' && renderRegister()}
-            {page === 'verifyOtp' && renderVerifyOtp()}
-            {page === 'forgotPassword' && renderForgotPassword()}
-            {page === 'resetPassword' && renderResetPassword()}
+        <div className="app-container">
+            <Navbar />
+            {msg.text && <div id="messageBox" className={msg.type}>{msg.text}</div>}
+            {page === 'home' && <HomePage />}
+            {page === 'login' && <LoginPage />}
+            {page === 'register' && <RegisterPage />}
+            {page === 'verifyOtp' && <VerifyOtpPage />}
+            {page === 'forgotPassword' && <ForgotPage />}
+            {page === 'resetPassword' && <ResetPage />}
+            {page === 'dashboard' && <DashboardPage />}
+            {page === 'createPost' && <CreatePostPage />}
+            {page === 'postDetail' && <PostDetailPage />}
+            {page === 'profile' && <ProfilePage />}
         </div>
     );
 };
