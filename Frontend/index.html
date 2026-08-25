@@ -1,21 +1,228 @@
 <!DOCTYPE html>
-<html lang="bn">
+<html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Found & Lost - হারানো ও পাওয়া</title>
-    <link rel="stylesheet" href="style.css" />
-    
-    <!-- React + ReactDOM CDN -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <!-- Babel for JSX -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Campus Board — Lost & Found</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="root"></div>
 
-    <script type="text/babel" src="app.js"></script>
-    <script type="text/babel" src="main.js"></script>
+<header class="navbar">
+  <div class="logo" onclick="showPage('home')"><span class="pin">📌</span> Campus Board</div>
+  <nav>
+    <a href="#" onclick="showPage('home')">Board</a>
+    <a href="#" onclick="showPage('post')">Pin an item</a>
+    <a href="#" onclick="showPage('myitems')">My pins</a>
+    <a href="#" id="authLink" onclick="showPage('login')">Log in</a>
+    <a href="#" id="registerLink" onclick="showPage('register')" class="cta-link">Sign up</a>
+    <a href="#" id="logoutLink" onclick="logout()" style="display:none;">Log out</a>
+    <span id="userGreeting" class="user-greeting"></span>
+  </nav>
+</header>
+
+<main>
+
+  <!-- HOME / BROWSE -->
+  <section id="page-home" class="page active">
+    <div class="board-head">
+      <h1>The Board</h1>
+      <p class="sub">Everything reported lost or found on campus, pinned up in real time.</p>
+    </div>
+
+    <div class="filter-bar">
+      <input type="text" id="searchInput" placeholder="Search title, description, location…">
+      <select id="typeFilter">
+        <option value="">Lost & Found</option>
+        <option value="lost">Lost only</option>
+        <option value="found">Found only</option>
+      </select>
+      <select id="categoryFilter">
+        <option value="">All categories</option>
+        <option value="Electronics">Electronics</option>
+        <option value="Documents">Documents</option>
+        <option value="Bags">Bags</option>
+        <option value="Books">Books</option>
+        <option value="Accessories">Accessories</option>
+        <option value="Other">Other</option>
+      </select>
+      <button onclick="loadItems()">Search</button>
+    </div>
+
+    <div id="itemsList" class="board-grid"></div>
+  </section>
+
+  <!-- REGISTER -->
+  <section id="page-register" class="page">
+    <div class="auth-wrap">
+      <div class="auth-card">
+        <span class="eyebrow">Step 1 of 2</span>
+        <h2>Create your account</h2>
+        <p class="card-sub">We'll email you a one-time code to confirm it's really you.</p>
+        <form id="registerForm">
+          <label>Full name
+            <input id="reg-name" placeholder="Jamie Rivera" required>
+          </label>
+          <label>Campus email
+            <input id="reg-email" type="email" placeholder="you@university.edu" required>
+          </label>
+          <label>Password
+            <input id="reg-password" type="password" placeholder="At least 6 characters" required minlength="6">
+          </label>
+          <button type="submit">Send verification code</button>
+        </form>
+        <p id="register-msg" class="msg"></p>
+        <p class="switch-link">Already have an account? <a href="#" onclick="showPage('login')">Log in</a></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- VERIFY OTP -->
+  <section id="page-verify" class="page">
+    <div class="auth-wrap">
+      <div class="auth-card otp-card">
+        <span class="eyebrow">Step 2 of 2</span>
+        <h2>Check your inbox</h2>
+        <p class="card-sub">Enter the 6-digit code we sent to<br><b id="verify-email-display"></b></p>
+        <form id="otpForm">
+          <div class="otp-boxes" id="otpBoxes">
+            <input maxlength="1" inputmode="numeric" class="otp-digit" data-i="0">
+            <input maxlength="1" inputmode="numeric" class="otp-digit" data-i="1">
+            <input maxlength="1" inputmode="numeric" class="otp-digit" data-i="2">
+            <input maxlength="1" inputmode="numeric" class="otp-digit" data-i="3">
+            <input maxlength="1" inputmode="numeric" class="otp-digit" data-i="4">
+            <input maxlength="1" inputmode="numeric" class="otp-digit" data-i="5">
+          </div>
+          <button type="submit">Verify account</button>
+        </form>
+        <button id="resendBtn" class="link-btn">Didn't get it? Resend code</button>
+        <p id="verify-msg" class="msg"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- LOGIN -->
+  <section id="page-login" class="page">
+    <div class="auth-wrap">
+      <div class="auth-card">
+        <span class="eyebrow">Welcome back</span>
+        <h2>Log in</h2>
+        <form id="loginForm">
+          <label>Email
+            <input id="login-email" type="email" placeholder="you@university.edu" required>
+          </label>
+          <label>Password
+            <input id="login-password" type="password" placeholder="Your password" required>
+          </label>
+          <button type="submit">Log in</button>
+        </form>
+        <p id="login-msg" class="msg"></p>
+        <p class="switch-link">
+          <a href="#" onclick="showPage('forgot')">Forgot password?</a> ·
+          New here? <a href="#" onclick="showPage('register')">Sign up</a>
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- FORGOT PASSWORD -->
+  <section id="page-forgot" class="page">
+    <div class="auth-wrap">
+      <div class="auth-card">
+        <span class="eyebrow">Reset access</span>
+        <h2>Forgot your password?</h2>
+        <form id="forgotForm">
+          <label>Registered email
+            <input id="forgot-email" type="email" placeholder="you@university.edu" required>
+          </label>
+          <button type="submit">Send reset code</button>
+        </form>
+        <form id="resetForm" style="display:none;">
+          <label>Reset code
+            <input id="reset-otp" placeholder="6-digit code" required>
+          </label>
+          <label>New password
+            <input id="reset-password" type="password" placeholder="At least 6 characters" required minlength="6">
+          </label>
+          <button type="submit">Set new password</button>
+        </form>
+        <p id="forgot-msg" class="msg"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- POST ITEM -->
+  <section id="page-post" class="page">
+    <div class="auth-wrap">
+      <div class="auth-card wide-card">
+        <span class="eyebrow">New pin</span>
+        <h2>Report a lost or found item</h2>
+        <form id="itemForm">
+          <div class="type-toggle">
+            <input type="radio" name="itype" id="type-lost" value="lost" checked>
+            <label for="type-lost" class="toggle-lost">I lost something</label>
+            <input type="radio" name="itype" id="type-found" value="found">
+            <label for="type-found" class="toggle-found">I found something</label>
+          </div>
+          <label>Title
+            <input id="item-title" placeholder="e.g. Black leather wallet" required>
+          </label>
+          <label>Description
+            <textarea id="item-description" placeholder="Color, brand, distinguishing details…" required></textarea>
+          </label>
+          <div class="form-row">
+            <label>Category
+              <select id="item-category" required>
+                <option value="Electronics">Electronics</option>
+                <option value="Documents">Documents</option>
+                <option value="Bags">Bags</option>
+                <option value="Books">Books</option>
+                <option value="Accessories">Accessories</option>
+                <option value="Other">Other</option>
+              </select>
+            </label>
+            <label>Location
+              <input id="item-location" placeholder="e.g. Library, 2nd floor" required>
+            </label>
+          </div>
+          <label>Contact info
+            <input id="item-contact" placeholder="Phone or email" required>
+          </label>
+          <label>Image URL <span class="optional">(optional)</span>
+            <input id="item-image" placeholder="https://…">
+          </label>
+          <button type="submit">Pin to the board</button>
+        </form>
+        <p id="post-msg" class="msg"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- MY ITEMS -->
+  <section id="page-myitems" class="page">
+    <div class="board-head">
+      <h1>My pins</h1>
+      <p class="sub">Everything you've reported. Mark it resolved once it's back where it belongs.</p>
+    </div>
+    <div id="myItemsList" class="board-grid"></div>
+  </section>
+
+</main>
+
+<!-- ITEM DETAIL MODAL -->
+<div id="itemModal" class="modal">
+  <div class="modal-content">
+    <span class="close-btn" onclick="closeModal()">&times;</span>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<footer>
+  <p>Campus Board — Lost & Found, built for students.</p>
+</footer>
+
+<script src="app.js"></script>
 </body>
-</html> 
+</html>
