@@ -1,5 +1,6 @@
 // ===== CONFIG =====
-const API = 'https://lost-found-2nke.onrender.com/api';
+// ✅ FIX: removed '/api' from base URL; it will be added in apiCall
+const API = 'https://lost-found-2nke.onrender.com';
 
 // ===== PAGE ROUTING =====
 function showPage(page) {
@@ -36,15 +37,35 @@ function authHeaders() {
   return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
 }
 
+// ✅ FIXED apiCall function – adds /api prefix & normalizes message fields
 async function apiCall(endpoint, method = 'GET', body = null, needsAuth = false) {
   const opts = {
     method,
     headers: needsAuth ? authHeaders() : { 'Content-Type': 'application/json' }
   };
   if (body) opts.body = JSON.stringify(body);
-  const res = await fetch(`${API}${endpoint}`, opts);
-  const data = await res.json();
-  return { ok: res.ok, data };
+
+  // Ensure endpoint starts with /
+  const fullEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const url = `${API}/api${fullEndpoint}`;  // ✅ /api added here
+
+  try {
+    const res = await fetch(url, opts);
+    const data = await res.json();
+
+    // ✅ Normalize message field – supports both 'msg' and 'message'
+    if (data.message && !data.msg) {
+      data.msg = data.message;
+    }
+    if (data.msg && !data.message) {
+      data.message = data.msg;
+    }
+
+    return { ok: res.ok, data };
+  } catch (err) {
+    console.error('API Error:', err);
+    return { ok: false, data: { msg: 'Network error. Please try again.' } };
+  }
 }
 
 // ===== REGISTER =====
