@@ -1,4 +1,3 @@
-// main.js - Mount React app to #root
-const rootElement = document.getElementById('root');
-const root = ReactDOM.createRoot(rootElement);
+// main.js - Mount React app to DOM
+const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<App />);

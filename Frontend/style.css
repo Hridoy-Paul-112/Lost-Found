@@ -15,14 +15,14 @@ body {
     padding: 20px;
 }
 
-/* Main card */
-.auth-container {
+/* Main container */
+.container {
     background: white;
     max-width: 420px;
     width: 100%;
     padding: 35px 30px;
     border-radius: 20px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
     border: 1px solid #ddd;
     animation: fadeUp 0.5s ease;
 }
@@ -38,7 +38,6 @@ h2 {
     font-size: 28px;
     margin-bottom: 4px;
 }
-
 .subtitle {
     text-align: center;
     color: #555;
@@ -46,7 +45,7 @@ h2 {
     font-size: 14px;
 }
 
-/* Input fields */
+/* Input groups */
 .input-group {
     margin-bottom: 16px;
 }
@@ -68,10 +67,36 @@ h2 {
 .input-group input:focus {
     border-color: #1e3a8a;
     outline: none;
-    box-shadow: 0 0 0 4px rgba(30, 58, 138, 0.1);
+    box-shadow: 0 0 0 4px rgba(30,58,138,0.1);
+}
+.input-group input:disabled {
+    background: #f0f0f0;
 }
 
-/* Button */
+/* OTP input group */
+.otp-group {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin: 15px 0;
+}
+.otp-group input {
+    width: 50px;
+    height: 55px;
+    text-align: center;
+    font-size: 22px;
+    font-weight: bold;
+    border: 2px solid #ccc;
+    border-radius: 10px;
+    transition: 0.3s;
+}
+.otp-group input:focus {
+    border-color: #1e3a8a;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(30,58,138,0.2);
+}
+
+/* Buttons */
 .btn {
     width: 100%;
     padding: 14px;
@@ -87,6 +112,13 @@ h2 {
 }
 .btn:hover { background: #0f265c; }
 .btn:disabled { background: #888; cursor: not-allowed; }
+
+.btn-secondary {
+    background: transparent;
+    color: #1e3a8a;
+    border: 2px solid #1e3a8a;
+}
+.btn-secondary:hover { background: #e0e7ff; }
 
 /* Message box */
 #messageBox {
@@ -108,7 +140,7 @@ h2 {
     color: #721c24;
 }
 
-/* Toggle link */
+/* Toggle links */
 .toggle-link {
     text-align: center;
     margin-top: 20px;
@@ -123,6 +155,19 @@ h2 {
 }
 .toggle-link span:hover { color: #0f265c; }
 
-/* Extra fields (hidden by default) */
-.extra-fields { display: none; }
-.extra-fields.show { display: block; }
+/* Resend link */
+.resend-link {
+    text-align: center;
+    margin-top: 10px;
+    font-size: 13px;
+}
+.resend-link span {
+    color: #1e3a8a;
+    cursor: pointer;
+    font-weight: 600;
+}
+.resend-link span:hover { text-decoration: underline; }
+.resend-link .disabled {
+    color: #888;
+    cursor: not-allowed;
+}
