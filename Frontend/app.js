@@ -1,202 +1,174 @@
-// 1. DOM elements
-const authPage = document.getElementById('authPage');
-const navbar = document.getElementById('navbar');
-const dashboardPage = document.getElementById('dashboardPage');
+// app.js - React component for Login/Register
 
-const loginForm = document.getElementById('loginForm');
-const registerForm = document.getElementById('registerForm');
-const authMessage = document.getElementById('authMessage');
+const App = () => {
+    // State variables
+    const [isLogin, setIsLogin] = React.useState(true); // true=login, false=register
+    const [form, setForm] = React.useState({
+        name: '',
+        email: '',
+        password: '',
+        confirmPassword: '',
+        university: ''
+    });
+    const [loading, setLoading] = React.useState(false);
+    const [message, setMessage] = React.useState({ text: '', type: '' });
 
-const showRegisterLink = document.getElementById('showRegisterLink');
-const showLoginLink = document.getElementById('showLoginLink');
+    // Handle input change
+    const handleChange = (e) => {
+        setForm({ ...form, [e.target.name]: e.target.value });
+        if (message.text) setMessage({ text: '', type: '' });
+    };
 
-const userNameDisplay = document.getElementById('userNameDisplay');
-const studentIdDisplay = document.getElementById('studentIdDisplay');
+    // Toggle between login and register
+    const toggleMode = () => {
+        setIsLogin(!isLogin);
+        setForm({ name: '', email: '', password: '', confirmPassword: '', university: '' });
+        setMessage({ text: '', type: '' });
+    };
 
-// 2. Helper functions
+    // Form submit
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        setMessage({ text: '', type: '' });
 
-function showMessage(text, type = 'success') {
-  authMessage.textContent = text;
-  authMessage.className = type; // 'success' or 'error'
-  authMessage.style.display = 'block';
-  // auto hide after 4 seconds
-  setTimeout(() => {
-    authMessage.style.display = 'none';
-  }, 4000);
-}
+        // Validation for register
+        if (!isLogin && form.password !== form.confirmPassword) {
+            setMessage({ text: 'Passwords do not match!', type: 'error' });
+            setLoading(false);
+            return;
+        }
 
-// Get stored users from localStorage (or empty array)
-function getUsers() {
-  const data = localStorage.getItem('users');
-  return data ? JSON.parse(data) : [];
-}
+        // Prepare API call
+        const endpoint = isLogin ? 'login' : 'register';
+        const url = `http://localhost:5000/api/auth/${endpoint}`;
+        let body = {};
+        if (isLogin) {
+            body = { email: form.email, password: form.password };
+        } else {
+            body = {
+                name: form.name,
+                email: form.email,
+                password: form.password,
+                university: form.university
+            };
+        }
 
-// Save users array to localStorage
-function saveUsers(users) {
-  localStorage.setItem('users', JSON.stringify(users));
-}
+        try {
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Something went wrong');
 
-// Get currently logged-in user (from sessionStorage)
-function getCurrentUser() {
-  const data = sessionStorage.getItem('currentUser');
-  return data ? JSON.parse(data) : null;
-}
+            // Success
+            localStorage.setItem('token', data.token);
+            setMessage({
+                text: `${isLogin ? 'Login' : 'Registration'} successful! Welcome ${data.name}`,
+                type: 'success'
+            });
+            console.log('User data:', data);
+            // After 2 seconds, you can redirect (optional)
+            setTimeout(() => {
+                alert('You are now logged in! (Dashboard coming next)');
+            }, 1000);
+        } catch (err) {
+            setMessage({ text: err.message, type: 'error' });
+        } finally {
+            setLoading(false);
+        }
+    };
 
-// ============================================================
-// 3. Registration
-// ============================================================
-registerForm.addEventListener('submit', function (e) {
-  e.preventDefault();
+    // JSX
+    return (
+        <div className="auth-container">
+            <h2>🔍 Found & Lost</h2>
+            <p className="subtitle">{isLogin ? 'Login to your account' : 'Create a new account'}</p>
 
-  const name = document.getElementById('regName').value.trim();
-  const email = document.getElementById('regEmail').value.trim().toLowerCase();
-  const studentId = document.getElementById('regStudentId').value.trim();
-  const password = document.getElementById('regPassword').value.trim();
+            {message.text && (
+                <div id="messageBox" className={message.type}>
+                    {message.text}
+                </div>
+            )}
 
-  // --- Validation ---
-  if (!name || !email || !studentId || !password) {
-    showMessage('All fields are required.', 'error');
-    return;
-  }
-  if (password.length < 6) {
-    showMessage('Password must be at least 6 characters.', 'error');
-    return;
-  }
-  // Simple email format check
-  if (!email.includes('@') || !email.includes('.')) {
-    showMessage('Please enter a valid email address.', 'error');
-    return;
-  }
+            <form onSubmit={handleSubmit}>
+                {/* Extra fields for registration */}
+                {!isLogin && (
+                    <div className="extra-fields show">
+                        <div className="input-group">
+                            <label>Full Name</label>
+                            <input
+                                type="text"
+                                name="name"
+                                placeholder="Your name"
+                                value={form.name}
+                                onChange={handleChange}
+                                required
+                            />
+                        </div>
+                        <div className="input-group">
+                            <label>University</label>
+                            <input
+                                type="text"
+                                name="university"
+                                placeholder="e.g. Dhaka University"
+                                value={form.university}
+                                onChange={handleChange}
+                                required
+                            />
+                        </div>
+                    </div>
+                )}
 
-  // Check if email already registered
-  const users = getUsers();
-  if (users.some(user => user.email === email)) {
-    showMessage('This email is already registered. Please login.', 'error');
-    return;
-  }
+                <div className="input-group">
+                    <label>Email</label>
+                    <input
+                        type="email"
+                        name="email"
+                        placeholder="you@example.com"
+                        value={form.email}
+                        onChange={handleChange}
+                        required
+                    />
+                </div>
+                <div className="input-group">
+                    <label>Password</label>
+                    <input
+                        type="password"
+                        name="password"
+                        placeholder="Min 6 characters"
+                        value={form.password}
+                        onChange={handleChange}
+                        required
+                        minLength="6"
+                    />
+                </div>
+                {!isLogin && (
+                    <div className="input-group">
+                        <label>Confirm Password</label>
+                        <input
+                            type="password"
+                            name="confirmPassword"
+                            placeholder="Retype password"
+                            value={form.confirmPassword}
+                            onChange={handleChange}
+                            required
+                        />
+                    </div>
+                )}
 
-  // Create new user object (store plain password for demo – in real app, hash it)
-  const newUser = {
-    name,
-    email,
-    studentId,
-    password, // ⚠️ For demo only; real apps use hashing
-  };
+                <button type="submit" className="btn" disabled={loading}>
+                    {loading ? 'Please wait...' : (isLogin ? 'Login' : 'Register')}
+                </button>
+            </form>
 
-  users.push(newUser);
-  saveUsers(users);
-
-  // Clear form
-  registerForm.reset();
-  showMessage('Registration successful! You can now login.', 'success');
-
-  // Switch to login form
-  registerForm.style.display = 'none';
-  loginForm.style.display = 'flex'; // (it's a flex column by default)
-});
-
-// ============================================================
-// 4. Login
-// ============================================================
-loginForm.addEventListener('submit', function (e) {
-  e.preventDefault();
-
-  const email = document
-    .getElementById('loginEmail')
-    .value.trim()
-    .toLowerCase();
-  const password = document.getElementById('loginPassword').value.trim();
-
-  if (!email || !password) {
-    showMessage('Please fill in both fields.', 'error');
-    return;
-  }
-
-  const users = getUsers();
-  const user = users.find(u => u.email === email && u.password === password);
-
-  if (!user) {
-    showMessage('Invalid email or password.', 'error');
-    return;
-  }
-
-  // Login successful – store session
-  sessionStorage.setItem('currentUser', JSON.stringify(user));
-  // Update UI
-  renderDashboard(user);
-  showPage('dashboard');
-  // Clear login form
-  loginForm.reset();
-  showMessage('Welcome back, ' + user.name + '!', 'success');
-});
-
-// ============================================================
-// 5. Dashboard & Navigation
-// ============================================================
-function renderDashboard(user) {
-  userNameDisplay.textContent = user.name;
-  studentIdDisplay.textContent = user.studentId;
-}
-
-function showPage(page) {
-  // Hide all pages
-  document
-    .querySelectorAll('[id$="Page"]')
-    .forEach(el => (el.style.display = 'none'));
-  // Show the requested page
-  const target = document.getElementById(page + 'Page');
-  if (target) target.style.display = 'block';
-}
-
-// Toggle between login / register forms
-showRegisterLink.addEventListener('click', function (e) {
-  e.preventDefault();
-  loginForm.style.display = 'none';
-  registerForm.style.display = 'flex';
-  authMessage.style.display = 'none';
-});
-
-showLoginLink.addEventListener('click', function (e) {
-  e.preventDefault();
-  registerForm.style.display = 'none';
-  loginForm.style.display = 'flex';
-  authMessage.style.display = 'none';
-});
-
-// Logout
-function logout() {
-  sessionStorage.removeItem('currentUser');
-  // Show auth page, hide navbar and dashboard
-  authPage.style.display = 'flex';
-  navbar.style.display = 'none';
-  dashboardPage.style.display = 'none';
-  // Also hide any other pages
-  document
-    .querySelectorAll('[id$="Page"]')
-    .forEach(el => (el.style.display = 'none'));
-  // Show login form (default)
-  loginForm.style.display = 'flex';
-  registerForm.style.display = 'none';
-  // Clear messages
-  authMessage.style.display = 'none';
-}
-
-// ============================================================
-// 6. Auto-login check on page load
-// ============================================================
-document.addEventListener('DOMContentLoaded', function () {
-  const user = getCurrentUser();
-  if (user) {
-    // User already logged in
-    authPage.style.display = 'none';
-    navbar.style.display = 'flex';
-    renderDashboard(user);
-    showPage('dashboard');
-  } else {
-    // Show auth page
-    authPage.style.display = 'flex';
-    navbar.style.display = 'none';
-    loginForm.style.display = 'flex';
-    registerForm.style.display = 'none';
-  }
-});
+            <div className="toggle-link">
+                <span onClick={toggleMode}>
+                    {isLogin ? "Don't have an account?  Register" : 'Already have an account?  Login'}
+                </span>
+            </div>
+        </div>
+    );
+};
