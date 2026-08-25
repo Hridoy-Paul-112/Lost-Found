@@ -1,3 +1,7 @@
+// ============================================================
+// Backend/index.js – Complete API
+// Posts are protected – only logged-in users can see them
+// ============================================================
 
 // ✅ Single axios import – no duplicates
 const axios = require('axios');
@@ -12,9 +16,9 @@ const bcrypt = require('bcryptjs');
 
 const app = express();
 
-
-// CORS CONFIGURATION – FIXED
-
+// ============================================================
+// CORS CONFIGURATION – allows Vercel frontend
+// ============================================================
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:5500',
@@ -25,10 +29,7 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl)
     if (!origin) return callback(null, true);
-    
-    // Allow if origin is in the allowed list OR is a vercel.app subdomain
     if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('vercel.app')) {
       callback(null, true);
     } else {
@@ -43,18 +44,16 @@ app.use(cors({
 
 app.use(express.json());
 
-
+// ============================================================
 // DATABASE CONNECTION
-
+// ============================================================
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('✅ MongoDB connected'))
   .catch(err => console.error('❌ MongoDB error:', err.message));
 
-
+// ============================================================
 // SCHEMAS
-
-
-// ---- User Schema ----
+// ============================================================
 const userSchema = new mongoose.Schema({
   name: String,
   email: { type: String, unique: true },
@@ -63,7 +62,6 @@ const userSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', userSchema);
 
-// ---- OTP Schema ----
 const otpSchema = new mongoose.Schema({
   email: String,
   otp: String,
@@ -71,7 +69,6 @@ const otpSchema = new mongoose.Schema({
 });
 const Otp = mongoose.model('Otp', otpSchema);
 
-// ---- Item Schema ----
 const itemSchema = new mongoose.Schema({
   title: String,
   description: String,
@@ -87,9 +84,9 @@ const itemSchema = new mongoose.Schema({
 });
 const Item = mongoose.model('Item', itemSchema);
 
-
+// ============================================================
 // HELPERS
-
+// ============================================================
 const genOtp = () => Math.floor(100000 + Math.random() * 900000).toString();
 
 async function sendOtpEmail(email, otp) {
@@ -126,10 +123,9 @@ function auth(req, res, next) {
   }
 }
 
+// ============================================================
 // AUTH ROUTES
-
-
-// ---- Step 1: Register -> sends OTP ----
+// ============================================================
 app.post('/api/auth/register', async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -160,7 +156,6 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
-// ---- Step 2: Verify OTP ----
 app.post('/api/auth/verify-otp', async (req, res) => {
   try {
     const { email, otp } = req.body;
@@ -178,7 +173,6 @@ app.post('/api/auth/verify-otp', async (req, res) => {
   }
 });
 
-// ---- Resend OTP ----
 app.post('/api/auth/resend-otp', async (req, res) => {
   try {
     const { email } = req.body;
@@ -198,7 +192,6 @@ app.post('/api/auth/resend-otp', async (req, res) => {
   }
 });
 
-// ---- Login ----
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -221,7 +214,6 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// ---- Forgot password -> send OTP ----
 app.post('/api/auth/forgot-password', async (req, res) => {
   try {
     const { email } = req.body;
@@ -240,7 +232,6 @@ app.post('/api/auth/forgot-password', async (req, res) => {
   }
 });
 
-// ---- Reset password with OTP ----
 app.post('/api/auth/reset-password', async (req, res) => {
   try {
     const { email, otp, newPassword } = req.body;
@@ -259,7 +250,6 @@ app.post('/api/auth/reset-password', async (req, res) => {
   }
 });
 
-// ---- Get current user ----
 app.get('/api/auth/me', auth, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
@@ -269,11 +259,11 @@ app.get('/api/auth/me', auth, async (req, res) => {
   }
 });
 
+// ============================================================
+// ITEM ROUTES – PROTECTED (require login)
+// ============================================================
 
-// ITEM ROUTES
-
-
-// ---- Create item ----
+// ---- Create item (protected) ----
 app.post('/api/items', auth, async (req, res) => {
   try {
     const item = await Item.create({
@@ -288,8 +278,8 @@ app.post('/api/items', auth, async (req, res) => {
   }
 });
 
-// ---- Get all items (public) ----
-app.get('/api/items', async (req, res) => {
+// ---- Get all items (protected) ----
+app.get('/api/items', auth, async (req, res) => {
   try {
     const { search, type, category } = req.query;
     const query = {};
@@ -310,8 +300,8 @@ app.get('/api/items', async (req, res) => {
   }
 });
 
-// ---- Get single item ----
-app.get('/api/items/:id', async (req, res) => {
+// ---- Get single item (protected) ----
+app.get('/api/items/:id', auth, async (req, res) => {
   try {
     const item = await Item.findById(req.params.id);
     if (!item) return res.status(404).json({ msg: 'Item not found' });
@@ -321,7 +311,7 @@ app.get('/api/items/:id', async (req, res) => {
   }
 });
 
-// ---- Get my items ----
+// ---- Get my items (protected) ----
 app.get('/api/items/user/mine', auth, async (req, res) => {
   try {
     const items = await Item.find({ createdBy: req.user.email }).sort({ createdAt: -1 });
@@ -331,7 +321,7 @@ app.get('/api/items/user/mine', auth, async (req, res) => {
   }
 });
 
-// ---- Update item (mark resolved) ----
+// ---- Update item (protected) ----
 app.put('/api/items/:id', auth, async (req, res) => {
   try {
     const item = await Item.findById(req.params.id);
@@ -346,7 +336,7 @@ app.put('/api/items/:id', auth, async (req, res) => {
   }
 });
 
-// ---- Delete item ----
+// ---- Delete item (protected) ----
 app.delete('/api/items/:id', auth, async (req, res) => {
   try {
     const item = await Item.findById(req.params.id);
@@ -360,14 +350,14 @@ app.delete('/api/items/:id', auth, async (req, res) => {
   }
 });
 
-
+// ============================================================
 // HEALTH CHECK
-
+// ============================================================
 app.get('/', (req, res) => res.send('✅ Lost & Found API is running'));
 
-
+// ============================================================
 // START SERVER
-
+// ============================================================
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);

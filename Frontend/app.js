@@ -1,5 +1,5 @@
 // ===== CONFIG =====
-const API = 'https://lost-found-2nke.onrender.com';   // base URL (no trailing /api)
+const API = 'https://lost-found-2nke.onrender.com';
 
 // ===== PAGE ROUTING =====
 function showPage(page) {
@@ -18,13 +18,11 @@ function updateNav() {
   const token = localStorage.getItem('token');
   const name = localStorage.getItem('userName');
   
-  // Show/hide the two account boxes
   const loggedOut = document.getElementById('loggedOutBox');
   const loggedIn = document.getElementById('loggedInBox');
   if (loggedOut) loggedOut.style.display = token ? 'none' : 'flex';
   if (loggedIn) loggedIn.style.display = token ? 'flex' : 'none';
   
-  // Update greeting
   const greeting = document.getElementById('userGreeting');
   if (greeting) greeting.textContent = token ? `Hi, ${name}` : '';
 }
@@ -50,12 +48,11 @@ async function apiCall(endpoint, method = 'GET', body = null, needsAuth = false)
   if (body) opts.body = JSON.stringify(body);
 
   const fullEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  const url = `${API}/api${fullEndpoint}`;   // /api added here
+  const url = `${API}/api${fullEndpoint}`;
 
   try {
     const res = await fetch(url, opts);
     const data = await res.json();
-    // Normalise message fields
     if (data.message && !data.msg) data.msg = data.message;
     if (data.msg && !data.message) data.message = data.msg;
     return { ok: res.ok, data };
@@ -220,9 +217,24 @@ document.getElementById('itemForm').addEventListener('submit', async (e) => {
   }
 });
 
-// ===== LOAD ITEMS (PUBLIC BOARD) =====
+// ===== LOAD ITEMS (PUBLIC BOARD – requires login) =====
 async function loadItems() {
   const list = document.getElementById('itemsList');
+  const token = localStorage.getItem('token');
+
+  // If not logged in, show login prompt
+  if (!token) {
+    list.innerHTML = `
+      <div class="empty" style="grid-column:1/-1; padding:2rem; background:white; border-radius:8px;">
+        <p style="font-size:1.1rem; margin-bottom:0.5rem;">🔒 Please log in to see the board.</p>
+        <p><a href="#" onclick="showPage('login')" style="color:var(--navy); font-weight:600;">Log in</a> or 
+        <a href="#" onclick="showPage('register')" style="color:var(--navy); font-weight:600;">Sign up</a></p>
+      </div>
+    `;
+    return;
+  }
+
+  // If logged in, fetch posts
   const search = document.getElementById('searchInput').value;
   const type = document.getElementById('typeFilter').value;
   const category = document.getElementById('categoryFilter').value;
@@ -234,10 +246,16 @@ async function loadItems() {
 
   list.innerHTML = '<p class="empty" style="color:var(--muted);">Loading posts...</p>';
 
-  const { ok, data } = await apiCall(`/items?${params.toString()}`);
+  const { ok, data } = await apiCall(`/items?${params.toString()}`, 'GET', null, true);
 
   if (!ok) {
-    list.innerHTML = '<p class="empty" style="color:var(--red);">⚠️ Could not load posts. Please try again later.</p>';
+    // If token expired or invalid, show login prompt again
+    list.innerHTML = `
+      <div class="empty" style="grid-column:1/-1; padding:2rem; background:white; border-radius:8px;">
+        <p style="font-size:1.1rem; margin-bottom:0.5rem;">🔒 Session expired or you are not logged in.</p>
+        <p><a href="#" onclick="showPage('login')" style="color:var(--navy); font-weight:600;">Log in again</a></p>
+      </div>
+    `;
     console.error('Failed to load items:', data);
     return;
   }
@@ -304,11 +322,18 @@ async function deleteItem(id) {
   loadMyItems();
 }
 
-// ===== ITEM DETAIL MODAL =====
+// ===== ITEM DETAIL MODAL (protected) =====
 async function openModal(id) {
-  const { ok, data } = await apiCall(`/items/${id}`);
+  const token = localStorage.getItem('token');
+  if (!token) {
+    alert('Please log in to view item details.');
+    showPage('login');
+    return;
+  }
+
+  const { ok, data } = await apiCall(`/items/${id}`, 'GET', null, true);
   if (!ok) {
-    alert('Could not load item details.');
+    alert('Could not load item details. Please log in again.');
     return;
   }
 
