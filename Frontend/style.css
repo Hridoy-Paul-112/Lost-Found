@@ -1,8 +1,3 @@
-/* ===== TOKENS =====
-   Palette: Chalkboard navy #1B2A38, corkboard tan #C9A97A, cork-dark #A9835A,
-   paper cream #FAF6EE, pin red #D64545, pin green #3F8F5F, ink #22303B
-   Display: Space Grotesk (headings) / Body: Archivo / Mono: JetBrains Mono (codes, meta)
-*/
 
 * {
   box-sizing: border-box;
@@ -65,19 +60,46 @@ button {
 
 .navbar nav {
   display: flex;
-  gap: 1.3rem;
+  gap: 0.5rem;
 }
 
+/* ===== BOXED NAV LINKS (Public board, Pin an item, My pins) ===== */
 .navbar nav a {
   color: var(--cream);
   text-decoration: none;
-  font-size: 0.92rem;
-  opacity: 0.85;
-  transition: opacity 0.15s;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  transition: background 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
 }
 
 .navbar nav a:hover {
-  opacity: 1;
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 0 2px rgba(201, 169, 122, 0.3);
+  transform: translateY(-1px);
+}
+
+/* keep the sign-up button (cta-link) distinct */
+.cta-link {
+  background: var(--red) !important;
+  border-color: var(--red) !important;
+  padding: 0.45rem 0.95rem;
+  border-radius: 3px;
+  opacity: 1 !important;
+  font-weight: 600;
+  border: none !important;
+}
+.cta-link:hover {
+  background: #b83838 !important;
+  border-color: #b83838 !important;
+  box-shadow: 0 0 0 2px rgba(214, 69, 69, 0.4) !important;
 }
 
 /* account box: visually separated from nav links by a divider */
@@ -103,14 +125,6 @@ button {
 
 .account-box a:hover {
   opacity: 1;
-}
-
-.cta-link {
-  background: var(--red);
-  padding: 0.45rem 0.95rem;
-  border-radius: 3px;
-  opacity: 1 !important;
-  font-weight: 600;
 }
 
 .user-greeting {
@@ -735,7 +749,11 @@ footer {
   }
   .navbar nav {
     flex-wrap: wrap;
-    gap: 0.9rem;
+    gap: 0.5rem;
+  }
+  .navbar nav a {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
   }
   .nav-account {
     border-left: none;
