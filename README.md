@@ -35,6 +35,4 @@ A comprehensive web application designed to help communities report lost items, 
 - **Package Manager**: Yarn
 - **Version Control**: Git & GitHub
 
-## 📁 Project Structure (Suggested)
 
-If both frontend and backend are in the same repository:
