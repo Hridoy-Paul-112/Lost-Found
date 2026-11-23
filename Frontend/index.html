@@ -6,6 +6,7 @@
   <title>Campus Board — Lost & Found</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Archivo:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+  
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -14,8 +15,11 @@
   <div class="logo" onclick="showPage('home')"><span class="pin">📌</span> Campus Board</div>
   <nav>
     <a href="#" onclick="showPage('home')">Public board</a>
+    <a href="#" onclick="showPage('matches')">Smart Matches</a>
     <a href="#" onclick="showPage('post')">Pin an item</a>
     <a href="#" onclick="showPage('myitems')">My pins</a>
+    <!-- Admin Link (Hidden by default) -->
+    <a href="#" id="adminNavLink" onclick="showPage('admin')" style="display:none; color: #e67e22;">Admin Panel</a>
   </nav>
   <div class="nav-account">
     <!-- Shown when logged OUT -->
@@ -72,6 +76,15 @@
     </div>
 
     <div id="itemsList" class="board-grid"></div>
+  </section>
+
+  <!-- SMART MATCHES (New Page for Teacher Requirement) -->
+  <section id="page-matches" class="page">
+    <div class="board-head">
+      <h1>Smart Matches</h1>
+      <p class="sub">Our rule-based engine compares Lost and Found items using category, description similarity, location, and date proximity.</p>
+    </div>
+    <div id="matchesList" class="board-grid" style="background: transparent; border: none; padding: 0;"></div>
   </section>
 
   <!-- REGISTER -->
@@ -211,6 +224,15 @@
           <label>Contact info
             <input id="item-contact" placeholder="Phone or email" required>
           </label>
+          <!-- Secret Question for Claims -->
+          <div class="form-row" style="margin-top: 10px; border-top: 1px dashed #ddd; padding-top: 10px;">
+            <label>Secret Question (For Claims)
+              <input id="item-secret-q" placeholder="e.g. What is the lock screen wallpaper?" required>
+            </label>
+            <label>Secret Answer
+              <input id="item-secret-a" placeholder="e.g. A dog" required>
+            </label>
+          </div>
           <label>Image URL <span class="optional">(optional)</span>
             <input id="item-image" placeholder="https://…">
           </label>
@@ -228,6 +250,23 @@
       <p class="sub">Only visible to you here — this is just a filtered view of your own posts, for editing and marking them resolved. They're still public on the main board for others to see.</p>
     </div>
     <div id="myItemsList" class="board-grid"></div>
+  </section>
+
+  <!-- ADMIN PANEL (New Page for Teacher Requirement) -->
+  <section id="page-admin" class="page">
+    <div class="board-head">
+      <h1>Admin Dashboard</h1>
+      <p class="sub">Verify claims, manage items, and view system analytics.</p>
+    </div>
+    
+    <div id="adminStats" style="display: flex; gap: 1rem; margin-bottom: 2rem;">
+      <!-- Stats injected via JS -->
+    </div>
+
+    <h2 style="font-family: 'Space Grotesk'; font-size: 1.5rem; margin-bottom: 1rem;">Pending Claims</h2>
+    <div id="adminClaims" style="background: white; border-radius: 8px; padding: 1.5rem; border: 1px solid #e8e0d0;">
+      <!-- Claims injected via JS -->
+    </div>
   </section>
 
 </main>

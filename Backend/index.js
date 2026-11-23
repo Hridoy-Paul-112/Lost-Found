@@ -1,24 +1,16 @@
-// ============================================================
-// Backend/index.js – Complete API
-// Posts are protected – only logged-in users can see them
-// ============================================================
 
-// ✅ Single axios import – no duplicates
+
 const axios = require('axios');
-
-// Rest of dependencies
 require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const cookieParser = require('cookie-parser');
 
 const app = express();
 
-// ============================================================
-// CORS CONFIGURATION – allows Vercel frontend
-// ============================================================
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:5500',
@@ -29,11 +21,9 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1 || origin.includes('vercel.app')) {
+    if (!origin || allowedOrigins.includes(origin) || origin.includes('vercel.app')) {
       callback(null, true);
     } else {
-      console.log('❌ CORS blocked origin:', origin);
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -43,21 +33,19 @@ app.use(cors({
 }));
 
 app.use(express.json());
+app.use(cookieParser());
 
-// ============================================================
-// DATABASE CONNECTION
-// ============================================================
+
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('✅ MongoDB connected'))
   .catch(err => console.error('❌ MongoDB error:', err.message));
 
-// ============================================================
-// SCHEMAS
-// ============================================================
+
 const userSchema = new mongoose.Schema({
   name: String,
   email: { type: String, unique: true },
   password: String,
+  role: { type: String, enum: ['student', 'admin', 'security'], default: 'student' },
   verified: { type: Boolean, default: false }
 });
 const User = mongoose.model('User', userSchema);
@@ -77,6 +65,8 @@ const itemSchema = new mongoose.Schema({
   location: String,
   contact: String,
   image: String,
+  secretQuestion: String,
+  secretAnswer: String,
   createdBy: String,
   createdByName: String,
   resolved: { type: Boolean, default: false },
@@ -84,20 +74,28 @@ const itemSchema = new mongoose.Schema({
 });
 const Item = mongoose.model('Item', itemSchema);
 
-// ============================================================
-// HELPERS
-// ============================================================
+const claimSchema = new mongoose.Schema({
+  itemId: { type: mongoose.Schema.Types.ObjectId, ref: 'Item' },
+  claimantEmail: String,
+  proofText: String,
+  proofImage: String,
+  status: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
+  createdAt: { type: Date, default: Date.now }
+});
+const Claim = mongoose.model('Claim', claimSchema);
+
+
 const genOtp = () => Math.floor(100000 + Math.random() * 900000).toString();
 
 async function sendOtpEmail(email, otp) {
   try {
     await axios.post('https://api.brevo.com/v3/smtp/email', {
-      sender: { name: 'Varsity Lost & Found', email: 'hridoy89hp@gmail.com' },
+      sender: { name: 'Campus Lost & Found', email: 'hridoy89hp@gmail.com' },
       to: [{ email }],
       subject: 'Your OTP Verification Code',
       htmlContent: `
         <div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;">
-          <h2 style="color:#2c3e50;">Varsity Lost & Found</h2>
+          <h2 style="color:#2c3e50;">Campus Lost & Found</h2>
           <p>Your OTP verification code is:</p>
           <h1 style="letter-spacing:5px;color:#e67e22;">${otp}</h1>
           <p>This code expires in 10 minutes. If you didn't request this, ignore this email.</p>
@@ -108,12 +106,12 @@ async function sendOtpEmail(email, otp) {
     console.log(`✅ OTP email sent to ${email}`);
   } catch (err) {
     console.error('❌ Email send error:', err.response?.data || err.message);
-    throw err;
   }
 }
 
-function auth(req, res, next) {
-  const token = req.headers.authorization?.split(' ')[1];
+// Authentication Middleware (Checks HTTPOnly Cookie OR Bearer Token)
+const auth = (req, res, next) => {
+  const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
   if (!token) return res.status(401).json({ msg: 'No token, access denied' });
   try {
     req.user = jwt.verify(token, process.env.JWT_SECRET);
@@ -121,7 +119,15 @@ function auth(req, res, next) {
   } catch {
     res.status(401).json({ msg: 'Invalid or expired token' });
   }
-}
+};
+
+// Role-Based Access Control Middleware
+const requireRole = (roles) => (req, res, next) => {
+  if (!roles.includes(req.user.role)) {
+    return res.status(403).json({ msg: 'Forbidden: Insufficient privileges' });
+  }
+  next();
+};
 
 // ============================================================
 // AUTH ROUTES
@@ -203,15 +209,29 @@ app.post('/api/auth/login', async (req, res) => {
     if (!match) return res.status(400).json({ msg: 'Incorrect password' });
 
     const token = jwt.sign(
-      { id: user._id, name: user.name, email: user.email },
+      { id: user._id, name: user.name, email: user.email, role: user.role },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
-    res.json({ msg: 'Login successful', token, name: user.name, email: user.email });
+
+    // Set HTTPOnly Cookie for enhanced security
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+      sameSite: 'Lax'
+    });
+    
+    res.json({ msg: 'Login successful', token, name: user.name, email: user.email, role: user.role });
   } catch (err) {
     console.error(err);
     res.status(500).json({ msg: 'Server error during login' });
   }
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  res.clearCookie('token');
+  res.json({ msg: 'Logged out successfully' });
 });
 
 app.post('/api/auth/forgot-password', async (req, res) => {
@@ -260,10 +280,62 @@ app.get('/api/auth/me', auth, async (req, res) => {
 });
 
 // ============================================================
-// ITEM ROUTES – PROTECTED (require login)
+// SMART MATCHING ENGINE (Rule-Based + Token Overlap)
 // ============================================================
+function calculateMatchScore(lostItem, foundItem) {
+  let score = 0;
+  
+  // 1. Category Match (Heavy weight: 40 pts)
+  if (lostItem.category === foundItem.category) score += 40;
+  
+  // 2. Keyword/Token Overlap in Description (Max: 30 pts)
+  const tokenize = (text) => text.toLowerCase().replace(/[^a-z0-9 ]/g, '').split(/\s+/).filter(w => w.length > 2);
+  const lostWords = new Set([...tokenize(lostItem.title), ...tokenize(lostItem.description)]);
+  const foundWords = new Set([...tokenize(foundItem.title), ...tokenize(foundItem.description)]);
+  let commonWords = 0;
+  lostWords.forEach(w => { if (foundWords.has(w)) commonWords++; });
+  const overlapRatio = commonWords / Math.max(lostWords.size, foundWords.size, 1);
+  score += overlapRatio * 30;
 
-// ---- Create item (protected) ----
+  // 3. Location Match (15 pts)
+  if (lostItem.location && foundItem.location) {
+    const loc1 = lostItem.location.toLowerCase();
+    const loc2 = foundItem.location.toLowerCase();
+    if (loc1.includes(loc2) || loc2.includes(loc1)) score += 15;
+  }
+
+  // 4. Date Difference (Less than 3 days: 15 pts)
+  const diffDays = Math.abs(new Date(lostItem.createdAt) - new Date(foundItem.createdAt)) / (1000 * 60 * 60 * 24);
+  if (diffDays <= 3) score += 15;
+
+  return Math.min(Math.round(score), 100);
+}
+
+app.get('/api/matches', auth, async (req, res) => {
+  try {
+    const lostItems = await Item.find({ type: 'lost', resolved: false });
+    const foundItems = await Item.find({ type: 'found', resolved: false });
+    let matches = [];
+
+    lostItems.forEach(lost => {
+      foundItems.forEach(found => {
+        const score = calculateMatchScore(lost, found);
+        if (score > 50) {
+          matches.push({ lost, found, score });
+        }
+      });
+    });
+
+    matches.sort((a, b) => b.score - a.score);
+    res.json(matches);
+  } catch (err) {
+    res.status(500).json({ msg: 'Error running matching engine' });
+  }
+});
+
+// ============================================================
+// ITEM ROUTES (Protected)
+// ============================================================
 app.post('/api/items', auth, async (req, res) => {
   try {
     const item = await Item.create({
@@ -278,11 +350,10 @@ app.post('/api/items', auth, async (req, res) => {
   }
 });
 
-// ---- Get all items (protected) ----
 app.get('/api/items', auth, async (req, res) => {
   try {
     const { search, type, category } = req.query;
-    const query = {};
+    const query = { resolved: false };
     if (type) query.type = type;
     if (category) query.category = category;
     if (search) {
@@ -300,7 +371,15 @@ app.get('/api/items', auth, async (req, res) => {
   }
 });
 
-// ---- Get single item (protected) ----
+app.get('/api/items/user/mine', auth, async (req, res) => {
+  try {
+    const items = await Item.find({ createdBy: req.user.email }).sort({ createdAt: -1 });
+    res.json(items);
+  } catch (err) {
+    res.status(500).json({ msg: 'Error fetching your items' });
+  }
+});
+
 app.get('/api/items/:id', auth, async (req, res) => {
   try {
     const item = await Item.findById(req.params.id);
@@ -311,23 +390,13 @@ app.get('/api/items/:id', auth, async (req, res) => {
   }
 });
 
-// ---- Get my items (protected) ----
-app.get('/api/items/user/mine', auth, async (req, res) => {
-  try {
-    const items = await Item.find({ createdBy: req.user.email }).sort({ createdAt: -1 });
-    res.json(items);
-  } catch (err) {
-    res.status(500).json({ msg: 'Error fetching your items' });
-  }
-});
-
-// ---- Update item (protected) ----
 app.put('/api/items/:id', auth, async (req, res) => {
   try {
     const item = await Item.findById(req.params.id);
     if (!item) return res.status(404).json({ msg: 'Item not found' });
-    if (item.createdBy !== req.user.email) return res.status(403).json({ msg: 'Not authorized' });
-
+    if (item.createdBy !== req.user.email && req.user.role !== 'admin') {
+      return res.status(403).json({ msg: 'Not authorized' });
+    }
     Object.assign(item, req.body);
     await item.save();
     res.json(item);
@@ -336,13 +405,13 @@ app.put('/api/items/:id', auth, async (req, res) => {
   }
 });
 
-// ---- Delete item (protected) ----
 app.delete('/api/items/:id', auth, async (req, res) => {
   try {
     const item = await Item.findById(req.params.id);
     if (!item) return res.status(404).json({ msg: 'Item not found' });
-    if (item.createdBy !== req.user.email) return res.status(403).json({ msg: 'Not authorized' });
-
+    if (item.createdBy !== req.user.email && req.user.role !== 'admin') {
+      return res.status(403).json({ msg: 'Not authorized' });
+    }
     await item.deleteOne();
     res.json({ msg: 'Item deleted' });
   } catch (err) {
@@ -351,15 +420,84 @@ app.delete('/api/items/:id', auth, async (req, res) => {
 });
 
 // ============================================================
-// HEALTH CHECK
+// CLAIM WORKFLOW (With Secret Question Verification)
 // ============================================================
-app.get('/', (req, res) => res.send('✅ Lost & Found API is running'));
+app.post('/api/claims', auth, async (req, res) => {
+  try {
+    const { itemId, proofText, secretAnswer, proofImage } = req.body;
+    const item = await Item.findById(itemId);
+    if (!item) return res.status(404).json({ msg: 'Item not found' });
+
+    if (item.secretAnswer && item.secretAnswer.toLowerCase() !== secretAnswer.toLowerCase()) {
+      return res.status(400).json({ msg: 'Incorrect secret answer' });
+    }
+
+    const claim = await Claim.create({
+      itemId,
+      claimantEmail: req.user.email,
+      proofText,
+      proofImage,
+      status: 'pending'
+    });
+    res.json({ msg: 'Claim submitted for verification', claim });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ msg: 'Error submitting claim' });
+  }
+});
+
+app.get('/api/claims', auth, requireRole(['admin', 'security']), async (req, res) => {
+  try {
+    const claims = await Claim.find().populate('itemId');
+    res.json(claims);
+  } catch (err) {
+    res.status(500).json({ msg: 'Error fetching claims' });
+  }
+});
+
+app.put('/api/claims/:id/verify', auth, requireRole(['admin', 'security']), async (req, res) => {
+  try {
+    const { status } = req.body;
+    const claim = await Claim.findByIdAndUpdate(req.params.id, { status }, { new: true });
+    if (!claim) return res.status(404).json({ msg: 'Claim not found' });
+
+    if (status === 'approved') {
+      await Item.findByIdAndUpdate(claim.itemId, { resolved: true });
+    }
+    res.json({ msg: `Claim ${status}`, claim });
+  } catch (err) {
+    res.status(500).json({ msg: 'Error verifying claim' });
+  }
+});
 
 // ============================================================
-// START SERVER
+// ADMIN ANALYTICS
 // ============================================================
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📍 Allowed origins:`, allowedOrigins);
+app.get('/api/admin/analytics', auth, requireRole(['admin']), async (req, res) => {
+  try {
+    const totalItems = await Item.countDocuments();
+    const lostItems = await Item.countDocuments({ type: 'lost' });
+    const foundItems = await Item.countDocuments({ type: 'found' });
+    const resolvedItems = await Item.countDocuments({ resolved: true });
+    const totalClaims = await Claim.countDocuments();
+    
+    res.json({ totalItems, lostItems, foundItems, resolvedItems, totalClaims });
+  } catch (err) {
+    res.status(500).json({ msg: 'Error fetching analytics' });
+  }
 });
+
+
+app.get('/', (req, res) => res.send('✅ Lost & Found API is running'));
+
+const PORT = process.env.PORT || 5000;
+
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`📍 Allowed origins:`, allowedOrigins);
+  });
+}
+
+// Export app for Jest/Supertest Testing (Sir's Requirement #4)
+module.exports = app;
